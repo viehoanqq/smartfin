@@ -1,0 +1,27 @@
+from sqlalchemy.orm import Session
+from app.models import User
+from app.schemas.user import UserCreate
+from app.core.security import get_password_hash
+
+def get_user_by_email(db: Session, email: str) -> User | None:
+    """Truy vấn user theo email"""
+    return db.query(User).filter(User.email == email).first()
+
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    """Truy vấn user theo ID"""
+    return db.query(User).filter(User.id == user_id).first()
+
+def create_user(db: Session, user_in: UserCreate) -> User:
+    """Thêm một user mới vào Database"""
+    new_user = User(
+        email=user_in.email,
+        password_hash=get_password_hash(user_in.password),
+        full_name=user_in.full_name,
+        currency=user_in.currency,
+        monthly_income=user_in.monthly_income,
+        role="user"
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
