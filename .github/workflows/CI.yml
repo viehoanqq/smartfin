@@ -13,7 +13,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        # SỬA Ở ĐÂY: Dùng image có tích hợp sẵn pgvector
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password123
@@ -42,13 +43,21 @@ jobs:
           pip install -r requirements.txt
           pip install pytest httpx
 
-      - name: Run Pytest
+      - name: Create Tables and Run Pytest
         working-directory: ./backend
         env:
           DATABASE_URL: "postgresql+psycopg://postgres:password123@localhost:5434/smartfin_db"
           PYTHONPATH: .
         run: |
-          pytest
+          # Bật extension vector trước
+          export PGPASSWORD=password123
+          psql -h localhost -p 5434 -U postgres -d smartfin_db -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          
+          # Chạy migration để sinh 16 bảng
+          alembic upgrade head
+          
+          # Test API
+          pytest -v
 
   frontend-test:
     name: Frontend Build & Test (React)
