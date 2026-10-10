@@ -1,46 +1,45 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+// Component phụ để chặn người dùng đã đăng nhập quay lại trang Login
+const RedirectIfAuthenticated = ({ children }) => {
+  const { user } = useAuth();
+  if (user) return <Navigate to="/" replace />;
+  return children;
+};
 
 export default function App() {
-  const [apiData, setApiData] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    // Gọi thẳng xuống Backend
-    axios.get('http://localhost:8000/api/health')
-      .then((response) => {
-        setApiData(response.data);
-      })
-      .catch((err) => {
-        console.error("Lỗi gọi API:", err);
-        setError('Không thể kết nối đến máy chủ Backend.');
-      });
-  }, []);
-
   return (
-    <div style={{ padding: '40px', fontFamily: 'sans-serif' }}>
-      <h1>SmartFin Dashboard</h1>
-      
-      <div style={{ 
-        padding: '20px', 
-        backgroundColor: '#f0f9ff', 
-        border: '1px solid #bae0ff',
-        borderRadius: '8px',
-        marginTop: '20px'
-      }}>
-        <h2>Trạng thái hệ thống:</h2>
-        
-        {error ? (
-          <p style={{ color: 'red' }}>{error}</p>
-        ) : apiData ? (
-          <ul>
-            <li><strong>Status:</strong> {apiData.status}</li>
-            <li><strong>Database:</strong> {apiData.database}</li>
-          </ul>
-        ) : (
-          <p>Đang tải dữ liệu từ API...</p>
-        )}
-      </div>
-    </div>
+    // Bọc toàn bộ App bằng AuthProvider để chia sẻ state User
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* TRANG ĐĂNG NHẬP (Chỉ dành cho người CHƯA đăng nhập) */}
+          <Route 
+            path="/login" 
+            element={
+              <RedirectIfAuthenticated>
+                <Login />
+              </RedirectIfAuthenticated>
+            } 
+          />
+
+          {/* TRANG CHỦ DASHBOARD (Được bảo vệ nghiêm ngặt) */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />  
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Bắt lỗi đường dẫn sai 404 */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
