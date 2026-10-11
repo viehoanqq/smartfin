@@ -18,17 +18,15 @@ Cảm ơn bạn đã quan tâm đóng góp cho SmartFin. Tài liệu này mô t�
 5. Commit thay đổi với thông điệp ngắn gọn, mô tả mục đích.
 6. Tạo pull request, mô tả vấn đề, giải pháp, các thay đổi chính và kết quả kiểm tra.
 
-Có thể dùng tiền tố nhánh để dễ nhận biết mục đích:
-
-```text
-feature/<ten-ngan>
-fix/<ten-ngan>
-docs/<ten-ngan>
-```
 
 ## Lệnh Git thường dùng
 
 Các lệnh dưới đây giả sử nhánh nền là `main` và remote là `origin`. Thay `<nhanh-cua-ban>` bằng tên nhánh tính năng của bạn.
+### Tạo nhánh git đầu tiên
+
+```powershell
+git checkout -b <ten nhanh>
+```
 
 ### Cập nhật trước mỗi phiên code
 
@@ -48,11 +46,11 @@ Sau khi code và chạy các kiểm tra phù hợp:
 
 ```powershell
 git add .
-git commit -m "feat/fix: mo-ta-ngan"
+git commit -m "feat/fix..: mo-ta-ngan"
 git push origin <nhanh-cua-ban>
 ```
+Sau khi đã push lên nhanh, hãy check CI và tạo pull request để được merge vào main
 
-Kiểm tra `git status` trước khi dùng `git add .` để tránh đưa file không liên quan hoặc file chứa thông tin nhạy cảm vào commit. Sau khi push, tạo pull request từ nhánh tính năng vào `main`; không push trực tiếp lên `main`.
 
 ## Quy ước khi sửa code
 
@@ -84,39 +82,14 @@ alembic revision --autogenerate -m "describe_schema_change"
 - Rà soát thủ công cả `upgrade()` và `downgrade()` trong migration được tạo. Không chỉnh sửa migration đã được áp dụng hoặc chia sẻ; hãy tạo migration mới.
 - Tránh thao tác làm mất dữ liệu ngoài dự kiến. Nếu thay đổi có nguy cơ ảnh hưởng dữ liệu hiện có, nêu rõ trong pull request và chuẩn bị cách chuyển đổi an toàn.
 
-## Kiểm tra trước khi tạo pull request
-
-### Backend
-
-Backend test cần PostgreSQL có extension pgvector và cấu hình `DATABASE_URL` hợp lệ trong `backend/.env`. Khởi động database theo README, sau đó chạy từ thư mục `backend`:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-alembic upgrade head
-pytest -v
-```
-
-Nếu chưa tạo virtual environment, hãy làm theo hướng dẫn cài đặt backend trong README trước.
-
-### Frontend
-
-Chạy từ thư mục `frontend`:
-
-```powershell
-npm ci
-npm run lint
-npm run build
-```
-
-CI hiện chạy backend test và frontend build. Lệnh lint nên được chạy cục bộ dù workflow CI hiện chưa thực thi lệnh này.
-
 ### Thay đổi tài liệu
 
 Đảm bảo hướng dẫn, tên endpoint, lệnh và cây thư mục trong tài liệu khớp với trạng thái code hiện tại. Phân biệt rõ tính năng đã triển khai với cấu trúc hoặc kế hoạch mục tiêu.
 
 ## Pull request
 
-Pull request nên:
+
+Pull request nên: 
 
 - Có tiêu đề ngắn gọn, mô tả chính xác nội dung thay đổi.
 - Giải thích vấn đề cần giải quyết và cách tiếp cận.
