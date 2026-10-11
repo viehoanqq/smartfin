@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models import User
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -29,6 +29,27 @@ def create_user(db: Session, user_in: UserCreate) -> User:
 def change_user_password(db: Session, user: User, new_password: str) -> User:
     """Cập nhật mật khẩu mới cho user"""
     user.password_hash = get_password_hash(new_password)
+    db.commit()
+    db.refresh(user)
+    return user
+
+def update_user_profile(db: Session, user: User, user_in: UserUpdate) -> User:
+    """Cập nhật thông tin hồ sơ người dùng"""
+    if user_in.full_name is not None:
+        user.full_name = user_in.full_name
+    if user_in.currency is not None:
+        user.currency = user_in.currency
+    if user_in.monthly_income is not None:
+        user.monthly_income = user_in.monthly_income
+        
+    # --- THÊM 3 TRƯỜNG MỚI VÀO ĐÂY ---
+    if user_in.phone_number is not None:
+        user.phone_number = user_in.phone_number
+    if user_in.date_of_birth is not None:
+        user.date_of_birth = user_in.date_of_birth
+    if user_in.avatar_url is not None:
+        user.avatar_url = user_in.avatar_url
+
     db.commit()
     db.refresh(user)
     return user

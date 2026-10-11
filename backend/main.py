@@ -1,4 +1,6 @@
 # main.py
+from app.api.v1.routers import userAPI
+from app.schemas import user
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -11,6 +13,7 @@ app = FastAPI(
     version="1.0.0"
 )
 app.include_router(authAPI.router, prefix="/api/v1")
+app.include_router(userAPI.router, prefix="/api/v1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

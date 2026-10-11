@@ -14,11 +14,22 @@ class User(Base):
     id = Column(BigInteger, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
+    
+    # --- THÔNG TIN CÁ NHÂN ---
     full_name = Column(String(255))
-    role = Column(String(50), default='user')
+    phone_number = Column(String(20), unique=True, nullable=True) # Thêm mới
+    date_of_birth = Column(Date, nullable=True)                   # Thêm mới
+    avatar_url = Column(Text, nullable=True)                      # Thêm mới (dùng Text để chứa URL dài từ S3/Drive)
+    
+    # --- CÀI ĐẶT TÀI CHÍNH ---
     currency = Column(String(10), default='VND')
-    monthly_income = Column(BigInteger)
+    monthly_income = Column(BigInteger, default=0)
+    
+    # --- QUẢN LÝ HỆ THỐNG ---
+    role = Column(String(50), default='user')
+    is_active = Column(Boolean, default=True)                     # Đề xuất thêm: Khóa/Mở tài khoản
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()) # Đề xuất thêm
 
 # 2. Bảng wallets
 class Wallet(Base):
