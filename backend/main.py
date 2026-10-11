@@ -4,16 +4,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.routers import auth
+from app.api.v1.routers import authAPI
 app = FastAPI(
     title="SmartFin API",
     description="Backend API cho ứng dụng quản lý tài chính SmartFin",
     version="1.0.0"
 )
-app.include_router(auth.router, prefix="/api/v1")
+app.include_router(authAPI.router, prefix="/api/v1")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], 
+    allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+        ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

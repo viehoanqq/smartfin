@@ -25,3 +25,10 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     db.commit()
     db.refresh(new_user)
     return new_user
+
+def change_user_password(db: Session, user: User, new_password: str) -> User:
+    """Cập nhật mật khẩu mới cho user"""
+    user.password_hash = get_password_hash(new_password)
+    db.commit()
+    db.refresh(user)
+    return user
