@@ -1,58 +1,85 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { MessageSquare } from 'lucide-react';
+import { authApi } from '../api/authApi'; 
+import Sidebar from '../components/layout/Sidebar';
+import Header from '../components/layout/Header';
+import OverviewCards from '../components/dashboard/OverviewCards';
+import TransactionList from '../components/dashboard/TransactionList';
+import WalletPanel from '../components/dashboard/WalletPanel';
+import ChatbotPanel from '../components/dashboard/ChatbotPanel';
+import TransactionForm from '../components/dashboard/TransactionForm'; 
 
 const Dashboard = () => {
-  // Lấy thông tin user và hàm logout từ AuthContext
-  const { user, logout } = useAuth(); 
-  
-  const [apiData, setApiData] = useState(null);
-  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
 
   useEffect(() => {
-    // Gọi test sức khỏe máy chủ
-    axios.get('http://localhost:8000/api/health')
-      .then((response) => setApiData(response.data))
-      .catch((err) => {
-        console.error("Lỗi gọi API:", err);
-        setError('Không thể kết nối đến máy chủ Backend.');
-      });
+    const fetchUserProfile = async () => {
+      try {
+        const response = await authApi.getMe(); 
+        setUser(response); 
+      } catch (error) {
+        console.error("Lỗi lấy thông tin người dùng:", error);
+      }
+    };
+    fetchUserProfile();
   }, []);
 
   return (
-    <div className="p-10 font-sans max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">SmartFin Dashboard</h1>
-        
-        {/* Nút Đăng xuất */}
-        <button 
-          onClick={logout}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow transition"
-        >
-          Đăng xuất
-        </button>
-      </div>
-      
-      {/* Hiển thị lời chào cá nhân hóa */}
-      <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
-        <h2 className="text-lg text-green-800">
-          Xin chào, <strong>{user?.full_name}</strong>! Email của bạn là: {user?.email}
-        </h2>
-      </div>
+    <div className="h-screen w-full bg-[#161822] font-sans flex flex-col overflow-hidden text-white relative">
+      <Header user={user} />
 
-      <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
-        <h2 className="text-xl font-semibold mb-4">Trạng thái hệ thống Backend:</h2>
-        
-        {error ? (
-          <p className="text-red-500 font-medium">{error}</p>
-        ) : apiData ? (
-          <ul className="space-y-2 text-gray-700">
-            <li><strong>Status:</strong> {apiData.status}</li>
-            {/* Tùy thuộc backend của bạn có trả về key database hay không */}
-            <li><strong>Message:</strong> {apiData.message || apiData.database}</li> 
-          </ul>
-        ) : (
-          <p className="text-gray-500 animate-pulse">Đang tải dữ liệu từ API...</p>
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar />
+
+        {/* VÙNG LÕI: Chứa toàn bộ nội dung */}
+        <div className="flex flex-1 overflow-y-auto custom-scrollbar flex-col bg-[#0F111A]">
+          <main className="flex-1 p-6 md:p-8 max-w-[1800px] mx-auto w-full">
+            
+            {/* SỬ DỤNG FLEX-WRAP: Không bao giờ bị bóp méo thẻ nữa */}
+            <div className="flex flex-col xl:flex-row gap-6 mb-8">
+              <div className="flex-1 w-full min-w-0">
+                <OverviewCards />
+              </div>
+              {/* ĐỔI TỪ 2xl:w-[380px] SANG xl:w-[380px] */}
+              <div className="w-full xl:w-[380px] shrink-0">
+                <WalletPanel user={user} />
+              </div>
+            </div>
+
+            <TransactionForm />
+            <TransactionList />
+          </main>
+        </div>
+
+        {/* ĐÂY LÀ ĐIỂM CHỐT (PLACEHOLDER PUSH EFFECT): 
+            Khung tàng hình này sẽ nở ra 380px đẩy nội dung sang trái một cách mượt mà */}
+        <div 
+          className={`transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shrink-0 ${
+            isChatOpen && !isFullscreen ? 'w-[380px]' : 'w-0'
+          }`}
+        ></div>
+
+        {/* CHATBOT ĐƯỢC CHÈN LÊN TRÊN */}
+        <ChatbotPanel 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)} 
+          isFullscreen={isFullscreen} 
+          setIsFullscreen={setIsFullscreen} 
+          message={chatMessage}
+          setMessage={setChatMessage}
+        />
+
+        {/* Nút lơ lửng mở Chatbot */}
+        {!isChatOpen && (
+          <button 
+            onClick={() => setIsChatOpen(true)}
+            className="absolute bottom-8 right-8 w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-blue-500/30 hover:scale-110 transition-all z-30"
+          >
+            <MessageSquare size={24} />
+          </button>
         )}
       </div>
     </div>

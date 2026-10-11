@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/Forgotpassword';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login
@@ -26,9 +27,31 @@ export default function App() {
               </RedirectIfAuthenticated>
             } 
           />
-          <Route path="/register" element={<Register />} />
-
+          <Route 
+            path="/register" 
+            element={
+              <RedirectIfAuthenticated>
+                <Register />
+              </RedirectIfAuthenticated>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <RedirectIfAuthenticated>
+                <ForgotPassword />
+              </RedirectIfAuthenticated>
+            } 
+          />
           {/* TRANG CHỦ DASHBOARD (Được bảo vệ nghiêm ngặt) */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />  
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/" 
             element={
