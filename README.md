@@ -3,6 +3,9 @@
 SmartFin là dự án nền tảng cho ứng dụng quản lý tài chính cá nhân. Repository hiện có giao diện React/Vite, API FastAPI, cấu hình PostgreSQL với pgvector và migration Alembic cho dữ liệu tài chính.
 
 hello world
+
+Xem [CONTRIBUTING.md](./CONTRIBUTING.md) để biết quy trình đóng góp và các bước kiểm tra trước khi tạo pull request.
+
 ## Công nghệ
 
 - Frontend: React 19, Vite 8, React Router, TanStack Query, Axios.
