@@ -107,7 +107,6 @@ const ForgotPassword = () => {
             <form onSubmit={handleResetPassword} className="flex flex-col items-center">
               <h1 className="text-4xl font-extrabold text-[red] mb-4">SmartFin</h1>
               <h1 className="text-2xl font-extrabold text-[#2c3e50] mb-2 text-center">Đặt lại mật khẩu</h1>
-              <p className="text-xs text-gray-500 mb-6 text-center">Mã OTP (tạm thời là 123456) đã được gửi tới <strong>{email}</strong></p>
               
               {error && <div className="text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded mb-3 w-full text-center">{error}</div>}
               {success && <div className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded mb-3 w-full text-center">{success}</div>}

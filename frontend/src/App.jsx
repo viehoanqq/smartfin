@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import Settings from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login
@@ -57,6 +58,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />  
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Settings />  
               </ProtectedRoute>
             } 
           />
