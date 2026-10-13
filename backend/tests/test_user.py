@@ -1,3 +1,4 @@
+from importlib.resources import files
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,3 +86,37 @@ def test_update_profile_partial_data():
     data = response.json()
     assert data["full_name"] == "Chỉ Đổi Tên"
     assert data["phone_number"] == "0987654321"
+def test_upload_avatar_success():
+    """Test API upload ảnh đại diện thành công"""
+    # Tạo một nội dung file ảnh giả (dummy bytes)
+    fake_image_content = b"fake image data"
+    
+    # Cấu trúc tham số files: {"tên_trường": ("tên_file", nội_dung, "content_type")}
+    files = {
+        "file": ("test_avatar.png", fake_image_content, "image/png")
+    }
+    
+    response = client.post("/api/v1/users/avatar-upload", files=files)    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Avatar uploaded successfully"    # Đảm bảo có trả về URL ảnh và chứa đường dẫn tĩnh
+    assert "user" in data
+    assert "avatar_url" in data["user"]
+    assert "/static/uploads/avatars/" in data["user"]["avatar_url"]
+
+
+def test_upload_avatar_invalid_format():
+    """Test API từ chối file không phải là ảnh"""
+    # Tạo một file text giả
+    fake_text_content = b"This is a text file, not an image"
+    
+    files = {
+        "file": ("document.txt", fake_text_content, "text/plain")
+    }
+    
+    response = client.post("/api/v1/users/avatar-upload", files=files)
+    
+    # Mong đợi mã lỗi 400 từ logic của UserService
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "Chỉ chấp nhận định dạng ảnh!"

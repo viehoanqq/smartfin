@@ -1,19 +1,19 @@
 # main.py
-from app.api.v1.routers import userAPI
+from app.api.v1.routers import user_api
 from app.schemas import user
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.routers import authAPI
+from app.api.v1.routers import auth_api
 app = FastAPI(
     title="SmartFin API",
     description="Backend API cho ứng dụng quản lý tài chính SmartFin",
     version="1.0.0"
 )
-app.include_router(authAPI.router, prefix="/api/v1")
-app.include_router(userAPI.router, prefix="/api/v1")
+app.include_router(auth_api.router, prefix="/api/v1")
+app.include_router(user_api.router, prefix="/api/v1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

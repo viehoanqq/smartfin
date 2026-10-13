@@ -6,10 +6,10 @@ from fastapi.testclient import TestClient
 
 # Thêm thư mục backend vào sys.path để Python nhận diện được module app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.services.authService import AuthService
+from app.services.auth_service import AuthService
 from main import app
 # Import thêm biến lưu OTP tạm thời từ Service để lấy mã tự động test
-from app.services.authService import AuthService
+from app.services.auth_service import AuthService
 # Khởi tạo client giả lập để gọi API như Postman
 client = TestClient(app)
 

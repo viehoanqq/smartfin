@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models import User
 from app.core.security import ALGORITHM, SECRET_KEY
 from app.schemas.auth import TokenPayload
-from app.repositories import userRepo as user_repo  # <-- Import Repository để thao tác DB
+from app.repositories import user_repo as user_repo  # <-- Import Repository để thao tác DB
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 

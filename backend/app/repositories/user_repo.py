@@ -1,7 +1,10 @@
+from http.client import HTTPException
+
 from sqlalchemy.orm import Session
 from app.models import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash
+from fastapi import UploadFile, HTTPException, File
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     """Truy vấn user theo email"""
@@ -49,7 +52,26 @@ def update_user_profile(db: Session, user: User, user_in: UserUpdate) -> User:
         user.date_of_birth = user_in.date_of_birth
     if user_in.avatar_url is not None:
         user.avatar_url = user_in.avatar_url
-
-    db.commit()
-    db.refresh(user)
-    return user
+    try:
+        db.commit()
+        db.refresh(user)
+        return user
+    except IntegrityError:
+    # Bắt lỗi khi trùng lặp (UNIQUE)
+        db.rollback() # Hoàn tác lại giao dịch để không kẹt DB
+        raise HTTPException(
+            status_code=400, 
+            detail="Số điện thoại này đã được sử dụng bởi tài khoản khác."
+        )
+def update_avatar_url(db: Session, user: User, avatar_url: str):
+    try:
+        user.avatar_url = avatar_url
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,    
+            detail="Đã xảy ra lỗi khi cập nhật ảnh đại diện."
+        )

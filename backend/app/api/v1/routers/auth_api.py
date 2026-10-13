@@ -7,7 +7,7 @@ from app.models import User
 from app.core.deps import get_current_user
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.auth import TokenResponse, ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
-from app.services.authService import AuthService
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
