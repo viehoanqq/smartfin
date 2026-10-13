@@ -24,6 +24,7 @@ const Profile = () => {
     onConfirm: null
   });
 
+  
   const closeModal = () => setModalConfig(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
