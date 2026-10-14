@@ -7,9 +7,11 @@ export const NAV_ITEMS = [
   { id: 'home', label: 'Trang chủ', icon: Home, active: true },
   { id: 'analytics', label: 'Thống kê', icon: PieChart, active: false },
   { id: 'wallet', label: 'Ví của tôi', icon: Wallet, active: false },
+  { id: 'transactions', label: 'Giao dịch', icon: Zap, active: false },
   { id: 'profile', label: 'Cá nhân', icon: User, active: false },
   { id: 'settings', label: 'Cài đặt', icon: Settings, active: false },
   { id: 'activity', label: 'Hoạt động', icon: Activity, active: false },
+  
 ];
 
 export const TRANSACTIONS = [

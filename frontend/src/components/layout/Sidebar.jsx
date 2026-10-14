@@ -24,7 +24,7 @@ const Sidebar = () => {
             return (
               <a
                 key={item.id}
-                href={`#${item.id}`}
+                href={`${item.id}`}
                 className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
                   item.active 
                     ? 'text-white font-semibold bg-[#252836]' 

@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Settings from './pages/Profile';
 import Dashboard from './pages/Dashboard';
+import Transactions from './pages/Transactions';
 import ProtectedRoute from './components/ProtectedRoute';
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login
 const RedirectIfAuthenticated = ({ children }) => {
@@ -69,7 +70,14 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-
+          <Route 
+            path="/transactions" 
+            element={
+              <ProtectedRoute>
+                <Transactions />  
+              </ProtectedRoute>
+            } 
+          />
           {/* Bắt lỗi đường dẫn sai 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
