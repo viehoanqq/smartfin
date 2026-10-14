@@ -1,6 +1,13 @@
+import csv
+from datetime import date, datetime  
+import math
+from typing import Optional
+from fastapi import UploadFile
+import io
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.schemas.transaction import TransactionCreate, TransactionUpdate
+from app.schemas.transaction import TransactionBulkCreate, TransactionCreate, TransactionUpdate
 from app.repositories import transaction_repo
 
 class TransactionService:
@@ -98,3 +105,137 @@ class TransactionService:
             return transaction_repo.restore_transaction_atomic(db, txn, wallet, apply_delta)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Lỗi khi hoàn tác giao dịch: {str(e)}")
+        
+    @staticmethod
+    def get_transactions_filtered(
+        db: Session,
+        user_id: int,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        category_id: Optional[int] = None,
+        wallet_id: Optional[int] = None,
+        txn_type: Optional[str] = None,
+        q: Optional[str] = None,
+        page: int = 1,
+        size: int = 20
+    ):
+        if page < 1:
+            page = 1
+        skip = (page - 1) * size
+
+        items, total = transaction_repo.get_filtered_transactions(
+            db=db, user_id=user_id,
+            from_date=from_date, to_date=to_date,
+            category_id=category_id, wallet_id=wallet_id,
+            txn_type=txn_type, search_q=q,
+            skip=skip, limit=size
+        )
+
+        total_pages = math.ceil(total / size) if total > 0 else 1
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "total_pages": total_pages
+        }
+
+    @staticmethod
+    def create_bulk_transactions(db: Session, user_id: int, bulk_in: TransactionBulkCreate):
+        if not bulk_in.transactions:
+            raise HTTPException(status_code=400, detail="Danh sách giao dịch trống")
+
+        # 1. Tìm tất cả các wallet_id xuất hiện trong danh sách để kiểm tra quyền sở hữu 1 lần
+        unique_wallet_ids = set(t.wallet_id for t in bulk_in.transactions)
+        wallets_map = {}
+
+        for w_id in unique_wallet_ids:
+            wallet = transaction_repo.get_wallet_by_id(db, w_id, user_id)
+            if not wallet:
+                raise HTTPException(status_code=422, detail=f"Ví ID {w_id} không tồn tại hoặc không thuộc người dùng")
+            wallets_map[w_id] = wallet
+
+        # 2. Giao cho Repo thực thi Atomic Bulk Insert
+        try:
+            return transaction_repo.create_bulk_transactions_atomic(
+                db=db,
+                user_id=user_id,
+                transactions_in=bulk_in.transactions,
+                wallets_map=wallets_map
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lỗi tạo hàng loạt: {str(e)}")
+
+    @staticmethod
+    def export_transactions_csv(db: Session, user_id: int, from_date: Optional[date] = None, to_date: Optional[date] = None):
+        """Xuất danh sách giao dịch ra chuỗi CSV"""
+        txns = transaction_repo.get_all_for_export(db, user_id, from_date, to_date)
+        
+        output = io.StringIO()
+        # Ghi BOM để mở bằng Excel trên Windows không bị lỗi font tiếng Việt
+        output.write('\ufeff') 
+        writer = csv.writer(output)
+        
+        # Header của file CSV
+        writer.writerow(["ID", "Ngày giao dịch", "Loại", "Số tiền", "Ví ID", "Danh mục ID", "Ghi chú", "Nguồn"])
+        
+        for t in txns:
+            writer.writerow([
+                t.id,
+                t.txn_date.strftime("%Y-%m-%d %H:%M:%S") if t.txn_date else "",
+                t.type,
+                t.amount,
+                t.wallet_id,
+                t.category_id,
+                t.note or "",
+                t.source or "manual"
+            ])
+            
+        output.seek(0)
+        return output
+
+    @staticmethod
+    def preview_import_csv(db: Session, user_id: int, file: UploadFile):
+        """Đọc file CSV tải lên, kiểm tra hợp lệ và trả về bản xem trước (chưa lưu DB)"""
+        if not file.filename.endswith(".csv"):
+            raise HTTPException(status_code=400, detail="Chỉ hỗ trợ định dạng file .csv")
+
+        content = file.file.read().decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(content))
+        
+        preview_list = []
+        for idx, row in enumerate(reader, start=1):
+            try:
+                amount = int(row.get("amount", 0))
+                wallet_id = int(row.get("wallet_id", 0))
+                category_id = int(row.get("category_id", 0))
+                txn_type = row.get("type", "expense").strip().lower()
+                
+                is_valid = True
+                error_msg = None
+
+                if amount <= 0:
+                    is_valid, error_msg = False, "Số tiền phải > 0"
+                elif txn_type not in ("income", "expense"):
+                    is_valid, error_msg = False, "Loại giao dịch phải là income hoặc expense"
+                elif not transaction_repo.get_wallet_by_id(db, wallet_id, user_id):
+                    is_valid, error_msg = False, f"Ví ID {wallet_id} không hợp lệ"
+
+                preview_list.append({
+                    "row_number": idx,
+                    "wallet_id": wallet_id,
+                    "category_id": category_id,
+                    "type": txn_type,
+                    "amount": amount,
+                    "txn_date": row.get("txn_date") or datetime.now(),
+                    "note": row.get("note", ""),
+                    "is_valid": is_valid,
+                    "error_message": error_msg
+                })
+            except Exception as e:
+                preview_list.append({
+                    "row_number": idx, "wallet_id": None, "category_id": None,
+                    "type": "expense", "amount": 0, "txn_date": None, "note": "",
+                    "is_valid": False, "error_message": f"Lỗi định dạng dữ liệu: {str(e)}"
+                })
+        return preview_list

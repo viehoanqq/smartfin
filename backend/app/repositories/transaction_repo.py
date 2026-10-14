@@ -1,6 +1,9 @@
+
+from typing import Dict, Optional, List
+
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-from datetime import datetime
+from datetime import date, datetime
 from app.models.domain import Transaction, Wallet, NLPFeedback
 from app.schemas.transaction import TransactionCreate
 
@@ -128,6 +131,115 @@ def restore_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, ap
         db.commit()
         db.refresh(txn)
         return txn
+    except Exception as e:
+        db.rollback()
+        raise e
+    
+def get_filtered_transactions(
+    db: Session,
+    user_id: int,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    category_id: Optional[int] = None,
+    wallet_id: Optional[int] = None,
+    txn_type: Optional[str] = None,
+    search_q: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20
+):
+    query = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
+        Transaction.deleted_at.is_(None)
+    )
+
+    # Áp dụng các bộ lọc nếu có truyền lên
+    if from_date:
+        query = query.filter(func.date(Transaction.txn_date) >= from_date)
+    if to_date:
+        query = query.filter(func.date(Transaction.txn_date) <= to_date)
+    if category_id:
+        query = query.filter(Transaction.category_id == category_id)
+    if wallet_id:
+        query = query.filter(Transaction.wallet_id == wallet_id)
+    if txn_type:
+        query = query.filter(Transaction.type == txn_type)
+    if search_q:
+        # Tìm kiếm không phân biệt hoa thường trong phần ghi chú (note)
+        query = query.filter(Transaction.note.ilike(f"%{search_q}%"))
+
+    # Đếm tổng số bản ghi khớp điều kiện (để FE tính số trang)
+    total = query.count()
+
+    # Lấy dữ liệu phân trang
+    items = (
+        query.order_by(Transaction.txn_date.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return items, total
+
+
+def get_all_for_export(db: Session, user_id: int, from_date: Optional[date] = None, to_date: Optional[date] = None):
+    """Lấy toàn bộ giao dịch (không phân trang) để xuất ra file CSV"""
+    query = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
+    if from_date:
+        query = query.filter(func.date(Transaction.txn_date) >= from_date)
+    if to_date:
+        query = query.filter(func.date(Transaction.txn_date) <= to_date)
+    return query.order_by(Transaction.txn_date.desc()).all()
+
+
+# --- 2. HÀM TẠO NHIỀU GIAO DỊCH CÙNG LÚC (BULK ATOMIC) ---
+def create_bulk_transactions_atomic(
+    db: Session,
+    user_id: int,
+    transactions_in: List[TransactionCreate],
+    wallets_map: Dict[int, Wallet] # Map {wallet_id: Wallet_Object}
+) -> List[Transaction]:
+    try:
+        created_txns = []
+        for txn_in in transactions_in:
+            # 1. Tạo record giao dịch
+            new_txn = Transaction(
+                user_id=user_id,
+                wallet_id=txn_in.wallet_id,
+                category_id=txn_in.category_id,
+                type=txn_in.type,
+                amount=txn_in.amount,
+                txn_date=txn_in.txn_date or datetime.now(),
+                note=txn_in.note,
+                source=txn_in.source,
+                raw_text=txn_in.raw_text,
+                ai_confidence=txn_in.ai_confidence
+            )
+            db.add(new_txn)
+            db.flush()
+
+            # 2. Cộng/Trừ số dư trên đúng cái Ví của giao dịch đó
+            wallet = wallets_map[txn_in.wallet_id]
+            delta = -txn_in.amount if txn_in.type == "expense" else txn_in.amount
+            wallet.balance += delta
+
+            # 3. Lưu NLP Feedback nếu có
+            if txn_in.source == "nlp" and txn_in.feedback and txn_in.raw_text:
+                fb = NLPFeedback(
+                    user_id=user_id,
+                    transaction_id=new_txn.id,
+                    raw_text=txn_in.raw_text,
+                    predicted_json=txn_in.feedback.predicted_json,
+                    corrected_json=txn_in.feedback.corrected_json
+                )
+                db.add(fb)
+
+            created_txns.append(new_txn)
+
+        # CHỐT HẠ: Cả đám thành công hết thì mới commit! 1 thằng lỗi là rollback sạch!
+        db.commit()
+        for t in created_txns:
+            db.refresh(t)
+        return created_txns
+
     except Exception as e:
         db.rollback()
         raise e

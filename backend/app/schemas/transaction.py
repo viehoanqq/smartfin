@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -40,3 +42,25 @@ class TransactionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+class PaginatedTransactionResponse(BaseModel):
+    items: List[TransactionResponse]
+    total: int
+    page: int
+    size: int
+    total_pages: int
+
+# 2. Schema cho POST /transactions/bulk (Dùng cho cả NLP nhiều mệnh đề & Import commit)
+class TransactionBulkCreate(BaseModel):
+    transactions: List[TransactionCreate]
+
+# 3. Schema cho POST /transactions/import (Preview)
+class ImportPreviewItem(BaseModel):
+    row_number: int
+    wallet_id: Optional[int]
+    category_id: Optional[int]
+    type: str
+    amount: int
+    txn_date: Optional[datetime]
+    note: Optional[str]
+    is_valid: bool
+    error_message: Optional[str] = None
