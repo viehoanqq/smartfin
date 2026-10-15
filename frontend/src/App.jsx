@@ -7,7 +7,10 @@ import Settings from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import ProtectedRoute from './components/ProtectedRoute';
-// Component phụ để chặn người dùng đã đăng nhập quay lại trang Login
+import AppLayout from './components/layout/AppLayout'; 
+import Error404 from './pages/Error404';
+
+// Component phụ để chặn người dùng đã đăng nhập quay lại trang Login/Register
 const RedirectIfAuthenticated = ({ children }) => {
   const { user } = useAuth();
   if (user) return <Navigate to="/" replace />;
@@ -16,11 +19,10 @@ const RedirectIfAuthenticated = ({ children }) => {
 
 export default function App() {
   return (
-    // Bọc toàn bộ App bằng AuthProvider để chia sẻ state User
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* TRANG ĐĂNG NHẬP (Chỉ dành cho người CHƯA đăng nhập) */}
+          {/* --- CÁC TRANG CÔNG KHAI (CHƯA ĐĂNG NHẬP) --- */}
           <Route 
             path="/login" 
             element={
@@ -45,41 +47,23 @@ export default function App() {
               </RedirectIfAuthenticated>
             } 
           />
-          {/* TRANG CHỦ DASHBOARD (Được bảo vệ nghiêm ngặt) */}
+
+          {/* --- CÁC TRANG NỘI BỘ (ĐÃ ĐĂNG NHẬP - DÙNG CHUNG APPLAYOUT & PROTECTEDROUTE) --- */}
           <Route 
-            path="/" 
             element={
               <ProtectedRoute>
-                <Dashboard />  
+                <AppLayout />
               </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />  
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <Settings />  
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/transactions" 
-            element={
-              <ProtectedRoute>
-                <Transactions />  
-              </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Settings />} />
+            <Route path="/transactions" element={<Transactions />} />
+          </Route>
+
           {/* Bắt lỗi đường dẫn sai 404 */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Error404 />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
