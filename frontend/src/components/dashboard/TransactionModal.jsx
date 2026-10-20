@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2, DollarSign, Wallet, Tag, Calendar, FileText } from 'lucide-react';
+import { X, Save, Loader2, DollarSign, Tag, Calendar, FileText } from 'lucide-react';
 import { transactionAPI } from '../../api/transactionAPI';
-
-const WALLETS = [
-  { id: 1, name: 'Ví Tiền Mặt' },
-  { id: 2, name: 'Techcombank Chính' },
-  { id: 3, name: 'Ví MoMo' },
-  { id: 4, name: 'Sacombank Tiết Kiệm' },
-  { id: 5, name: 'ZaloPay' },
-];
+import { walletAPI } from '../../api/walletAPI';
 
 const CATEGORIES = [
   { id: 1, name: 'Ăn uống & Cà phê', type: 'expense' },
@@ -24,7 +17,7 @@ const CATEGORIES = [
 
 const TransactionModal = ({ isOpen, onClose, onSuccess, editData = null }) => {
   const [formData, setFormData] = useState({
-    wallet_id: '1',
+    wallet_id: '',
     category_id: '1',
     type: 'expense',
     amount: '',
@@ -42,9 +35,16 @@ const TransactionModal = ({ isOpen, onClose, onSuccess, editData = null }) => {
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+    walletAPI.getMyWallet()
+      .then((w) => setFormData((prev) => ({ ...prev, wallet_id: String(w.id) })))
+      .catch(() => setErrorMessage('Không tải được ví của bạn.'));
+  }, [isOpen]);
+
+  useEffect(() => {
     if (editData) {
       setFormData({
-        wallet_id: String(editData.wallet_id || '1'),
+        wallet_id: String(editData.wallet_id || ''),
         category_id: String(editData.category_id || '1'),
         type: editData.type || 'expense',
         amount: String(editData.amount || ''),
@@ -53,7 +53,7 @@ const TransactionModal = ({ isOpen, onClose, onSuccess, editData = null }) => {
       });
     } else {
       setFormData({
-        wallet_id: '1',
+        wallet_id: '',
         category_id: '1',
         type: 'expense',
         amount: '',
@@ -207,25 +207,6 @@ const TransactionModal = ({ isOpen, onClose, onSuccess, editData = null }) => {
 
           {/* Chọn Ví & Danh mục */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-gray-200 mb-1.5 block">Ví thanh toán *</label>
-              <div className="relative flex items-center">
-                <Wallet size={18} className="absolute left-3.5 text-gray-400 pointer-events-none" />
-                <select 
-                  name="wallet_id"
-                  value={formData.wallet_id}
-                  onChange={handleChange}
-                  className="w-full bg-[#0F111A] border border-[#2E3448] focus:border-blue-500 rounded-xl pl-10 pr-4 py-3 text-sm text-white outline-none cursor-pointer"
-                >
-                  {WALLETS.map(w => (
-                    <option key={w.id} value={w.id} className="bg-[#181B26] text-white">
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             <div>
               <label className="text-xs font-semibold text-gray-200 mb-1.5 block">Danh mục *</label>
               <div className="relative flex items-center">
