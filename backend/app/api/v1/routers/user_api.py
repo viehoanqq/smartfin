@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status
 import typing
 from typing import List, Optional, Any
 from sqlalchemy.orm import Session
@@ -27,21 +27,5 @@ def update_profile(
             user_in=user_in
         )
         return updated_user
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-@router.post("/avatar-upload")
-def upload_avatar(
-    file: UploadFile = File(...),
-    current_user = Depends(get_current_user),      
-    db = Depends(get_db)
-):
-    try:
-        # Gọi service để xử lý upload avatar
-        updated_user = UserService.upload_avatar(
-            db=db, 
-            user=current_user, 
-            file=file
-        )
-        return {"message": "Avatar uploaded successfully", "user": updated_user}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User, Lock, Bell, Palette, Camera, Save, Loader2, CheckCircle, AlertTriangle } from 'lucide-react'; 
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Bell, Palette, Save, Loader2, CheckCircle, AlertTriangle } from 'lucide-react'; 
 import { userAPI } from '../api/userAPI'; 
 import ConfirmModal from '../components/common/ConfirmModal'; 
 import defaultAvatar from '../assets/imgs/avt-default.png'; 
@@ -11,10 +11,6 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
 
-  const fileInputRef = useRef(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [avatarFile, setAvatarFile] = useState(null); // Biến này lưu file thật để gửi xuống BE
-  
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
     title: "",
@@ -47,18 +43,6 @@ const Profile = () => {
     { id: 'appearance', label: 'Giao diện', icon: Palette },
   ];
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setAvatarFile(file); // Lưu file thật để call API
-      setAvatarPreview(URL.createObjectURL(file)); // Hiển thị xem trước ngay lập tức
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -73,14 +57,8 @@ const Profile = () => {
     };
 
     try {
-      // 2. CHUẨN HOÁ: Nếu user có chọn ảnh -> Gọi API upload ảnh trước
-      if (avatarFile) {
-        await userAPI.uploadAvatar(avatarFile);
-      }
-      
-      // 3. Sau khi upload ảnh xong (hoặc không đổi ảnh) -> Gọi API lưu thông tin text
-      // Lưu ý: Đảm bảo trong file userAPI.js, hàm update tên là updateProfile (hoặc updateUser tùy bạn đặt)
-      await userAPI.updateProfile(data); 
+      // Gọi API lưu thông tin hồ sơ
+      await userAPI.updateUser(data); 
       
       // Hiển thị modal thành công
       setModalConfig({
@@ -159,38 +137,19 @@ const Profile = () => {
                 <h3 className="text-xl font-bold text-white mb-6">Hồ sơ cá nhân</h3>
                 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8">
-                  <div className="relative group cursor-pointer shrink-0" onClick={triggerFileInput}>
+                  <div className="relative shrink-0">
                     <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 p-1">
                       <img 
-                        // 4. CHUẨN HOÁ: Sử dụng defaultAvatar nếu không có ảnh
-                        src={avatarPreview || user?.avatar_url || defaultAvatar} 
+                        src={defaultAvatar} 
                         alt="Avatar" 
                         className="w-full h-full rounded-full object-cover border-4 border-[#1a1c24] bg-[#252836]" 
                       />
-                    </div>
-                    <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera size={24} className="text-white" />
                     </div>
                   </div>
                   
                   <div className="flex-1">
                     <h4 className="text-white font-medium text-xl">{user?.full_name || 'Người dùng SmartFin'}</h4>
                     <p className="text-gray-400 text-sm mb-3">{user?.role === 'admin' ? 'Quản trị viên hệ thống' : 'Thành viên'}</p>
-                    
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      ref={fileInputRef} 
-                      onChange={handleAvatarChange} 
-                      className="hidden" 
-                    />
-                    <button 
-                      type="button" // Chống submit form nhầm khi bấm nút này
-                      onClick={triggerFileInput}
-                      className="px-4 py-2 bg-[#252836] hover:bg-[#2d3142] border border-[#3b3e4a] text-sm text-gray-200 rounded-xl transition-all"
-                    >
-                      Thay đổi ảnh đại diện
-                    </button>
                   </div>
                 </div>
 
