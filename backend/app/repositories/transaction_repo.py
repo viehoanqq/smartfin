@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 from datetime import date, datetime
 from app.models.domain import Transaction, Wallet, NLPFeedback
 from app.schemas.transaction import TransactionCreate
+from app.core.rules import balance_delta
 
 # --- CÁC HÀM TRUY VẤN (READ) ---
 
@@ -218,7 +219,7 @@ def create_bulk_transactions_atomic(
 
             # 2. Cộng/Trừ số dư trên đúng cái Ví của giao dịch đó
             wallet = wallets_map[txn_in.wallet_id]
-            delta = -txn_in.amount if txn_in.type == "expense" else txn_in.amount
+            delta = balance_delta(txn_in.type, txn_in.amount)
             wallet.balance += delta
 
             # 3. Lưu NLP Feedback nếu có

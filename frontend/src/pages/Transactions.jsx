@@ -8,14 +8,6 @@ import { userAPI } from '../api/userAPI';
 import { transactionAPI } from '../api/transactionAPI';
 import TransactionModal from '../components/dashboard/TransactionModal';
 
-const WALLET_NAMES = {
-  1: 'Ví Tiền Mặt',
-  2: 'Techcombank Chính',
-  3: 'Ví MoMo',
-  4: 'Sacombank Tiết Kiệm',
-  5: 'ZaloPay'
-};
-
 const CATEGORY_NAMES = {
   1: 'Ăn uống & Cà phê',
   2: 'Di chuyển & Xăng xe',
@@ -263,9 +255,10 @@ const Transactions = () => {
               onChange={handleFilterChange}
               className="w-full bg-[#0F111A] border border-[#2E3448] focus:border-blue-500 rounded-xl px-3 py-2.5 text-sm text-white outline-none cursor-pointer"
             >
-              <option value="" className="bg-[#181B26]">Tất cả (Thu / Chi)</option>
+              <option value="" className="bg-[#181B26]">Tất cả (Thu / Chi / Tiết kiệm)</option>
               <option value="expense" className="bg-[#181B26]">Khoản chi</option>
               <option value="income" className="bg-[#181B26]">Khoản thu</option>
+              <option value="saving" className="bg-[#181B26]">Tiết kiệm</option>
             </select>
           </div>
           <div>
@@ -386,7 +379,7 @@ const Transactions = () => {
                             ? 'bg-[#15803D] text-white' 
                             : 'bg-[#B91C1C] text-white'
                         }`}>
-                          {txn.type === 'income' ? 'Thu nhập' : 'Khoản chi'}
+                          {{ income: 'Thu nhập', saving: 'Tiết kiệm' }[txn.type] || 'Khoản chi'}
                         </span>
                       </td>
                       <td className={`py-4 px-6 text-right font-bold whitespace-nowrap ${
@@ -494,7 +487,7 @@ const Transactions = () => {
                 : 'bg-[#7F1D1D] border-[#EF4444] text-white'
             }`}>
               <span className="text-xs uppercase font-bold block mb-1 text-gray-200">
-                {viewingTxn.type === 'income' ? 'Khoản thu nhập' : 'Khoản chi tiêu'}
+                {{ income: 'Khoản thu nhập', saving: 'Khoản tiết kiệm' }[viewingTxn.type] || 'Khoản chi tiêu'}
               </span>
               <span className="text-2xl font-extrabold">
                 {viewingTxn.type === 'income' ? '+' : '-'}{Number(viewingTxn.amount).toLocaleString('vi-VN')} {user?.currency || 'VND'}
@@ -512,7 +505,7 @@ const Transactions = () => {
               <div className="flex items-center justify-between py-2 border-b border-[#2E3448]">
                 <span className="text-gray-300 flex items-center gap-2"><Wallet size={16} /> Ví thanh toán:</span>
                 <span className="text-white font-semibold">
-                  {WALLET_NAMES[viewingTxn.wallet_id] || `Ví #${viewingTxn.wallet_id}`}
+                  Ví chính
                 </span>
               </div>
 

@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.schemas.transaction import TransactionBulkCreate, TransactionCreate, TransactionUpdate
 from app.repositories import transaction_repo
+from app.core.rules import balance_delta
+
+SAVING_LOCKED_MSG = "Giao dịch tiết kiệm được quản lý ở mục Mục tiêu tiết kiệm, không sửa hoặc xóa tại đây"
+
 
 class TransactionService:
     
@@ -24,7 +28,7 @@ class TransactionService:
             raise HTTPException(status_code=422, detail="Ví không tồn tại hoặc không thuộc người dùng")
 
         # 2. Tính toán độ lệch số dư (Chi thì trừ, Thu thì cộng)
-        amount_delta = -data.amount if data.type == "expense" else data.amount
+        amount_delta = balance_delta(data.type, data.amount)
 
         # 3. Gọi Repo thực thi trọn gói trong 1 DB Transaction
         try:
@@ -44,10 +48,12 @@ class TransactionService:
         txn = transaction_repo.get_transaction_by_id(db, txn_id, user_id)
         if not txn:
             raise HTTPException(status_code=404, detail="Không tìm thấy giao dịch")
-
+        if txn.type == "saving":
+            raise HTTPException(status_code=400, detail=SAVING_LOCKED_MSG)
+        
         # 2. Lấy ví cũ và tính số tiền cần hoàn tác
         old_wallet = transaction_repo.get_wallet_by_id(db, txn.wallet_id, user_id)
-        revert_delta = txn.amount if txn.type == "expense" else -txn.amount
+        revert_delta = -balance_delta(txn.type, txn.amount)
 
         # 3. Xác định các thông tin mới sau khi sửa
         update_fields = data.model_dump(exclude_unset=True)
@@ -61,7 +67,7 @@ class TransactionService:
             raise HTTPException(status_code=422, detail="Ví mới không tồn tại hoặc không thuộc người dùng")
 
         # 5. Tính số tiền mới cần áp dụng
-        apply_delta = -new_amount if new_type == "expense" else new_amount
+        apply_delta = balance_delta(new_type, new_amount)
 
         # 6. Gọi Repo cập nhật nguyên tử
         try:
@@ -83,8 +89,11 @@ class TransactionService:
         if not txn:
             raise HTTPException(status_code=404, detail="Không tìm thấy giao dịch")
 
+        if txn.type == "saving":
+            raise HTTPException(status_code=400, detail=SAVING_LOCKED_MSG)
+
         wallet = transaction_repo.get_wallet_by_id(db, txn.wallet_id, user_id)
-        revert_delta = txn.amount if txn.type == "expense" else -txn.amount
+        revert_delta = -balance_delta(txn.type, txn.amount)
 
         try:
             transaction_repo.soft_delete_transaction_atomic(db, txn, wallet, revert_delta)
@@ -99,7 +108,7 @@ class TransactionService:
             raise HTTPException(status_code=404, detail="Giao dịch không tồn tại hoặc chưa bị xóa")
 
         wallet = transaction_repo.get_wallet_by_id(db, txn.wallet_id, user_id)
-        apply_delta = -txn.amount if txn.type == "expense" else txn.amount
+        apply_delta = balance_delta(txn.type, txn.amount)
 
         try:
             return transaction_repo.restore_transaction_atomic(db, txn, wallet, apply_delta)
