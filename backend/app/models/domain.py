@@ -106,18 +106,21 @@ class SavingGoal(Base):
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     target_amount = Column(BigInteger, nullable=False)
-    current_amount = Column(BigInteger, default=0)
-    deadline = Column(Date)
+    current_amount = Column(BigInteger, default=0) 
+    period = Column(String(50), nullable=False)
+    duration_value = Column(Integer, nullable=False)
     status = Column(String(50), default='active')
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    contributions = relationship("GoalContribution", back_populates="goal", cascade="all, delete-orphan")
 # 7. Bảng goal_contributions
 class GoalContribution(Base):
     __tablename__ = "goal_contributions"
     id = Column(BigInteger, primary_key=True, index=True)
     goal_id = Column(BigInteger, ForeignKey("saving_goals.id", ondelete="CASCADE"), nullable=False)
-    wallet_id = Column(BigInteger, ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
     amount = Column(BigInteger, nullable=False)
     contributed_at = Column(DateTime(timezone=True), server_default=func.now())
+    goal = relationship("SavingGoal", back_populates="contributions")
 
 # 8. Bảng nlp_feedback
 class NLPFeedback(Base):
