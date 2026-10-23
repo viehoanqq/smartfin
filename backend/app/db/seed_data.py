@@ -1,135 +1,133 @@
-import sys
+"""Dữ liệu DEMO: 1 người dùng mẫu + ví, ngân sách, giao dịch, mục tiêu tiết kiệm, chat.
+
+Chạy từ thư mục backend (sau khi alembic upgrade head):
+    python -m app.db.seed_data
+
+Khớp sơ đồ DB mới: danh mục là dữ liệu dùng chung nên script nạp danh mục mặc định
+(seed/default_categories.py) rồi chỉ TRA CỨU theo tên, không tự tạo danh mục riêng.
+Chạy lại nhiều lần an toàn: nếu user mẫu đã tồn tại thì bỏ qua.
+"""
 import os
-from datetime import datetime, timedelta, date
-# Tự động nhận diện thư mục gốc backend
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import sys
+from datetime import datetime, timedelta
 
-from app.db.session import SessionLocal
+# Tự động nhận diện thư mục gốc backend (để import app.* và seed.*)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-# Import tất cả các model từ file domain.py
-from app.models.domain import (
-    User, Wallet, Category, Budget, Transaction, 
-    RecurringTransaction, SavingGoal, Debt, 
-    ChatSession, ChatMessage, CategoryExample
-)
+from sqlalchemy import select
+
 from app.core.security import get_password_hash
+from app.db.session import SessionLocal
+from app.models.domain import (
+    Budget, Category, ChatMessage, ChatSession, GoalContribution,
+    SavingGoal, Transaction, User, Wallet,
+)
+from app.db.default_categories import seed as seed_default_categories
+
+DEMO_EMAIL = "hoang123@gmail.com"
+
+
 def seed_database():
     db = SessionLocal()
     try:
+        # 1. Danh mục mặc định dùng chung (idempotent)
+        seed_default_categories(db)
 
+        if db.scalar(select(User).where(User.email == DEMO_EMAIL)):
+            print(f"User {DEMO_EMAIL} đã tồn tại, bỏ qua seed demo.")
+            return
 
-        # 2. Tạo User mẫu
+        cats = {c.name: c.id for c in db.scalars(select(Category))}
+
+        # 2. User mẫu
         user = User(
-            email="hoang123@gmail.com",
-            password_hash=get_password_hash("123456"), # Thay bằng hash password thực tế nếu cần
+            email=DEMO_EMAIL,
+            password_hash=get_password_hash("123456"),
             full_name="Nguyễn Việt Hoàng",
             phone_number="0987652321",
-            date_of_birth=date(2004, 8, 16),
-            currency="VND",
-            monthly_income=15000000,
+            date_of_birth=datetime(2004, 8, 16).date(),
+            monthly_income=15_000_000,
             role="user",
-            is_active=True
+            is_active=True,
         )
         db.add(user)
-        db.flush() # Lấy user.id sau khi flush
-
-        # 3. Tạo Wallets (Ví tài khoản)
-        wallets = [
-            Wallet(user_id=user.id, name="Ví Tiền Mặt", type="cash", initial_balance=2000000, balance=1850000),
-            Wallet(user_id=user.id, name="Techcombank Chính", type="bank", initial_balance=10000000, balance=14500000),
-            Wallet(user_id=user.id, name="Ví MoMo", type="e-wallet", initial_balance=1000000, balance=850000),
-        ]
-        db.add_all(wallets)
         db.flush()
 
-        # 4. Tạo Categories (Danh mục Thu/Chi)
-        categories = [
-            # Chi tiêu (Expense)
-            Category(user_id=user.id, name="Ăn uống & Cà phê", type="expense", icon="coffee", color="#F87171"),
-            Category(user_id=user.id, name="Di chuyển & Xăng xe", type="expense", icon="car", color="#60A5FA"),
-            Category(user_id=user.id, name="Mua sắm cá nhân", type="expense", icon="shopping-bag", color="#34D399"),
-            Category(user_id=user.id, name="Hóa đơn Điện/Nước/Net", type="expense", icon="zap", color="#FBBF24"),
-            # Thu nhập (Income)
-            Category(user_id=user.id, name="Lương cứng hàng tháng", type="income", icon="briefcase", color="#4ADE80"),
-            Category(user_id=user.id, name="Thưởng dự án", type="income", icon="award", color="#A78BFA"),
-        ]
-        db.add_all(categories)
+        # 3. Ví (balance sẽ được tính lại từ giao dịch ở bước 8)
+        wallets = {
+            "cash": Wallet(user_id=user.id, name="Ví Tiền Mặt", type="cash", initial_balance=2_000_000, balance=0),
+            "bank": Wallet(user_id=user.id, name="Techcombank Chính", type="bank", initial_balance=10_000_000, balance=0),
+            "momo": Wallet(user_id=user.id, name="Ví MoMo", type="e-wallet", initial_balance=1_000_000, balance=0),
+        }
+        db.add_all(wallets.values())
         db.flush()
 
-        # Ánh xạ nhanh ID danh mục
-        cat_map = {c.name: c.id for c in categories}
-        wallet_map = {w.name: w.id for w in wallets}
+        # 4. Ngân sách (mỗi người 1 ngân sách cho mỗi danh mục)
+        budget_coffee = Budget(user_id=user.id, category_id=cats["Cà phê & đồ uống"],
+                               budget_amount=1_000_000, current_amount=0, alert_sent_level=0)
+        budget_move = Budget(user_id=user.id, category_id=cats["Di chuyển"],
+                             budget_amount=800_000, current_amount=0, alert_sent_level=0)
+        db.add_all([budget_coffee, budget_move])
+        db.flush()
 
-        # 5. Tạo Budgets (Ngân sách tháng)
-        budgets = [
-            Budget(user_id=user.id, category_id=cat_map["Ăn uống & Cà phê"], amount=4000000, period="monthly", start_date=date(2026, 10, 1), end_date=date(2026, 10, 31)),
-            Budget(user_id=user.id, category_id=cat_map["Mua sắm cá nhân"], amount=2000000, period="monthly", start_date=date(2026, 10, 1), end_date=date(2026, 10, 31)),
-        ]
-        db.add_all(budgets)
-
-        # 6. Tạo Transactions (Lịch sử giao dịch thực tế gần đây)
-        today = datetime.now()
-        transactions = [
-            Transaction(
-                user_id=user.id, wallet_id=wallet_map["Techcombank Chính"], category_id=cat_map["Lương cứng hàng tháng"],
-                type="income", amount=15000000, txn_date=today - timedelta(days=15),
-                note="Nhận lương tháng 10", source="manual"
-            ),
-            Transaction(
-                user_id=user.id, wallet_id=wallet_map["Ví Tiền Mặt"], category_id=cat_map["Ăn uống & Cà phê"],
-                type="expense", amount=45000, txn_date=today - timedelta(days=3),
-                note="Uống cafe sữa đá với bạn", source="manual"
-            ),
-            Transaction(
-                user_id=user.id, wallet_id=wallet_map["Ví MoMo"], category_id=cat_map["Di chuyển & Xăng xe"],
-                type="expense", amount=120000, txn_date=today - timedelta(days=2),
-                note="Đổ xăng xe máy", source="nlp", raw_text="đổ xăng 120k momo"
-            ),
-        ]
-        db.add_all(transactions)
-
-        # 7. Tạo RecurringTransactions (Giao dịch định kỳ)
-        recurring = RecurringTransaction(
-            user_id=user.id, wallet_id=wallet_map["Techcombank Chính"], category_id=cat_map["Hóa đơn Điện/Nước/Net"],
-            type="expense", amount=350000, note="Tiền cước Internet FPT hàng tháng",
-            frequency="monthly", next_run_date=date(2026, 11, 5), is_active=True
-        )
-        db.add(recurring)
-
-        # 8. Tạo SavingGoals (Mục tiêu tiết kiệm)
-        goal = SavingGoal(
-            user_id=user.id, name="Nâng cấp Laptop mới", target_amount=25000000,
-            current_amount=10000000, deadline=date(2026, 12, 31), status="active"
-        )
+        # 5. Mục tiêu tiết kiệm + lần nạp tiền
+        goal = SavingGoal(user_id=user.id, name="Nâng cấp Laptop mới", target_amount=25_000_000,
+                          period="thang", duration_value=6, status="active")
         db.add(goal)
-
-        # 9. Tạo Debts (Khoản vay/Cho vay)
-        debt = Debt(
-            user_id=user.id, kind="lend", person_name="Minh Quân",
-            amount=500000, remaining=500000, due_date=date(2026, 10, 30), status="pending"
-        )
-        db.add(debt)
-
-        # 10. Tạo Chat Session và Message mẫu cho AI Trợ lý
-        chat_session = ChatSession(user_id=user.id, title="Tư vấn chi tiêu tháng 10")
-        db.add(chat_session)
+        db.flush()
+        contribution = GoalContribution(goal_id=goal.id, amount=10_000_000)
+        db.add(contribution)
         db.flush()
 
-        chat_msg = ChatMessage(
-            session_id=chat_session.id, role="assistant",
-            content="Xin chào Hoàng! Mình là AI của SmartFin. Tháng này bạn đã chi 165.000 đ cho ăn uống và di chuyển.",
-            intent="greeting"
-        )
-        db.add(chat_msg)
+        # 6. Giao dịch (income | expense | saving)
+        now = datetime.now().astimezone()
+        txns = [
+            Transaction(user_id=user.id, wallet_id=wallets["bank"].id, category_id=cats["Lương"],
+                        type="income", amount=15_000_000, txn_date=now - timedelta(days=15),
+                        note="Nhận lương tháng 10", source="manual"),
+            Transaction(user_id=user.id, wallet_id=wallets["bank"].id, category_id=cats["Tiết kiệm"],
+                        type="saving", amount=10_000_000, txn_date=now - timedelta(days=14),
+                        note="Nạp mục tiêu laptop", source="manual",
+                        goal_contributions_id=contribution.id),
+            Transaction(user_id=user.id, wallet_id=wallets["cash"].id, category_id=cats["Cà phê & đồ uống"],
+                        type="expense", amount=45_000, txn_date=now - timedelta(days=3),
+                        note="Uống cafe sữa đá với bạn", source="manual", budget_id=budget_coffee.id),
+            Transaction(user_id=user.id, wallet_id=wallets["momo"].id, category_id=cats["Di chuyển"],
+                        type="expense", amount=120_000, txn_date=now - timedelta(days=2),
+                        note="Đổ xăng xe máy", source="nlp", raw_text="đổ xăng 120k momo",
+                        ai_confidence=0.93, budget_id=budget_move.id),
+        ]
+        db.add_all(txns)
+
+        # 7. Cập nhật số đã chi của ngân sách
+        budget_coffee.current_amount = 45_000
+        budget_move.current_amount = 120_000
+
+        # 8. BR01: số dư = ban đầu + thu - chi - tiết kiệm
+        for t in txns:
+            w = next(w for w in wallets.values() if w.id == t.wallet_id)
+            w.balance = (w.balance or 0) + (t.amount if t.type == "income" else -t.amount)
+        for w in wallets.values():
+            w.balance += w.initial_balance
+
+        # 9. Chat mẫu
+        session = ChatSession(user_id=user.id, title="Tư vấn chi tiêu tháng 10")
+        db.add(session)
+        db.flush()
+        db.add(ChatMessage(
+            session_id=session.id, role="assistant", intent="greeting",
+            content="Xin chào Hoàng! Mình là AI của SmartFin. Tháng này bạn đã chi 165.000 đ cho cà phê và di chuyển.",
+        ))
 
         db.commit()
-        print("Seed dữ liệu chuẩn thành công cho user: hoang.nguyen@smartfin.vn!")
-
+        print(f"Seed demo thành công. Đăng nhập: {DEMO_EMAIL} / 123456")
     except Exception as e:
         db.rollback()
         print(f"Lỗi khi seed dữ liệu: {e}")
+        raise
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed_database()
