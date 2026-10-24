@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.routers import auth_api, user_api, transaction_api, categories, wallet_api
+
+from app.api.v1.routers import auth_api, user_api, transaction_api, categories, wallet_api, saving_api
 
 app = FastAPI(
     title="SmartFin API",
@@ -18,6 +19,7 @@ app.include_router(user_api.router, prefix="/api/v1")
 app.include_router(transaction_api.router, prefix="/api/v1")
 app.include_router(categories.router, prefix="/api/v1")
 app.include_router(wallet_api.router, prefix="/api/v1")
+app.include_router(saving_api.router, prefix="/api/v1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

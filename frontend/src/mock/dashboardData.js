@@ -1,5 +1,5 @@
 import { 
-  Home, PieChart, Wallet, User, Settings, Activity, 
+  Home, PieChart, Wallet, User, Settings, Activity, PiggyBank,
   Zap, ShoppingCart, Briefcase, Film 
 } from 'lucide-react';
 
@@ -9,8 +9,9 @@ export const NAV_ITEMS = [
   { id: 'wallet', label: 'Ví của tôi', icon: Wallet, active: false },
   { id: 'transactions', label: 'Giao dịch', icon: Zap, active: false },
   { id: 'profile', label: 'Cá nhân', icon: User, active: false },
-  { id: 'settings', label: 'Cài đặt', icon: Settings, active: false },
+  { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank, active: false },
   { id: 'activity', label: 'Hoạt động', icon: Activity, active: false },
+  { id: 'settings', label: 'Cài đặt', icon: Settings, active: false },
   
 ];
 
