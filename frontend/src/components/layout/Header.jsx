@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, Bell, User, Settings, HelpCircle, LogOut, ChevronDown } from 'lucide-react';
+import defaultAvatar from '../../assets/imgs/avt-default.png';
 
 const Header = ({ user }) => {
   // Lấy tên và email từ dữ liệu user (nếu có), nếu không dùng mặc định
@@ -40,7 +41,7 @@ const Header = ({ user }) => {
           
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 p-[2px]">
             <img 
-              src="https://i.pravatar.cc/150?u=hoang" 
+              src={defaultAvatar} 
               alt="avatar" 
               className="w-full h-full rounded-full object-cover border-2 border-[#181920]" 
             />

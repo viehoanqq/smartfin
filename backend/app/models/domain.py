@@ -32,7 +32,7 @@ class User(Base):
 class Wallet(Base):
     __tablename__ = "wallets"
     id = Column(BigInteger, primary_key=True, index=True)
-    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)  # 1 user - 1 wallet
     name = Column(String(255), nullable=False)
     type = Column(String(50))
     initial_balance = Column(BigInteger, default=0)
@@ -41,6 +41,9 @@ class Wallet(Base):
 
 
 # 3. Bảng categories (dùng chung cho mọi người dùng, không có user_id/type)
+# 3. Bảng categories
+# Danh mục CỐ ĐỊNH, dùng chung cho mọi người dùng (không có user_id, không có parent_id).
+# "Ai dùng danh mục nào" được ghi ở transactions.user_id và budgets.user_id.
 class Category(Base):
     __tablename__ = "categories"
     id = Column(BigInteger, primary_key=True, index=True)
@@ -54,8 +57,13 @@ class Category(Base):
 
 
 # 4. Bảng budgets
+# Mỗi dòng = ngân sách của MỘT tháng cho MỘT danh mục.
+# Số đã chi KHÔNG lưu ở đây: tính từ transactions (cùng user_id, category_id, type='expense', trong tháng).
 class Budget(Base):
     __tablename__ = "budgets"
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_id", "month", name="uq_budget_user_category_month"),
+    )
     id = Column(BigInteger, primary_key=True, index=True)
     category_id = Column(BigInteger, ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -96,6 +104,9 @@ class GoalContribution(Base):
 # 7. Bảng transactions
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        Index("ix_transactions_user_category_date", "user_id", "category_id", "txn_date"),
+    )
     id = Column(BigInteger, primary_key=True, index=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     wallet_id = Column(BigInteger, ForeignKey("wallets.id", ondelete="RESTRICT"), nullable=False)
@@ -106,18 +117,31 @@ class Transaction(Base):
     amount = Column(BigInteger, nullable=False)
     txn_date = Column(DateTime(timezone=True), server_default=func.now())
     note = Column(Text)
-    source = Column(String(50))
+    source = Column(String(50))                  # manual | nlp | chat | import
     raw_text = Column(Text)
     ai_confidence = Column(Float)
-    create_at = Column(DateTime(timezone=True), server_default=func.now())
-    delete_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (
-        CheckConstraint("type IN ('income','expense','saving')", name="ck_transactions_type"),
-        CheckConstraint("amount > 0", name="ck_transactions_amount_positive"),
-        Index("ix_transactions_user_txn_date", "user_id", "txn_date"),
-    )
+# 6. Bảng saving_goals
+class SavingGoal(Base):
+    __tablename__ = "saving_goals"
+    id = Column(BigInteger, primary_key=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    target_amount = Column(BigInteger, nullable=False)
+    current_amount = Column(BigInteger, default=0)
+    deadline = Column(Date)
+    status = Column(String(50), default='active')
 
+# 7. Bảng goal_contributions
+class GoalContribution(Base):
+    __tablename__ = "goal_contributions"
+    id = Column(BigInteger, primary_key=True, index=True)
+    goal_id = Column(BigInteger, ForeignKey("saving_goals.id", ondelete="CASCADE"), nullable=False)
+    wallet_id = Column(BigInteger, ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
+    amount = Column(BigInteger, nullable=False)
+    contributed_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # 8. Bảng nlp_feedback
 class NLPFeedback(Base):
@@ -140,9 +164,6 @@ class Notification(Base):
     content = Column(Text)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (Index("ix_notifications_user_read", "user_id", "is_read"),)
-
 
 # 10. Bảng chat_sessions
 class ChatSession(Base):

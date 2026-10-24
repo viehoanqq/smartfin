@@ -51,7 +51,7 @@ def get_transactions(
     to_date: Optional[date] = Query(None, alias="to", description="Đến ngày (YYYY-MM-DD)"),
     category: Optional[int] = Query(None, description="Lọc theo category_id"),
     wallet: Optional[int] = Query(None, description="Lọc theo wallet_id"),
-    type: Optional[str] = Query(None, pattern="^(income|expense)$"),
+    type: Optional[str] = Query(None, pattern="^(income|expense|saving)$"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm trong ghi chú"),
     page: int = Query(1, ge=1, description="Số trang hiện tại"),
     size: int = Query(20, ge=1, le=100, description="Số bản ghi mỗi trang"),
