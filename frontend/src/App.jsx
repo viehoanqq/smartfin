@@ -11,6 +11,7 @@ import AppLayout from './components/layout/AppLayout';
 import Error404 from './pages/Error404';
 import Savings from './pages/Savings';
 import SavingDetail from './pages/SavingDetail';
+import Wallets from './pages/Wallets';
 
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login/Register
 const RedirectIfAuthenticated = ({ children }) => {
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/savings" element={<Savings />} />
             <Route path="/savings/:id" element={<SavingDetail />} />
+            <Route path="/wallets" element={<Wallets />} /> 
           </Route>
 
           {/* Bắt lỗi đường dẫn sai 404 */}
