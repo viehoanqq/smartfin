@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: ankane/pgvector:v0.5.0
@@ -12,6 +10,19 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .                 # Build từ thư mục gốc (nơi chứa Dockerfile vừa tạo)
+    container_name: smartfin_backend
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app       # Đồng bộ code real-time từ thư mục backend vào /app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password123@db:5432/smartfin_db
+    depends_on:
+      - db
 
 volumes:
   postgres_data:
