@@ -20,7 +20,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:password123@db:5432/smartfin_db
+      - DATABASE_URL=postgresql+psycopg://postgres:password123@db:5432/smartfin_db
     depends_on:
       - db
 
