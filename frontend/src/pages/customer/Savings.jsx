@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSavings, createSavingGoal } from '../api/savingsAPI';
+import { getSavings, createSavingGoal } from '../../services/savingsAPI';
 import { 
   PiggyBank, Plus, Clock, Target, Sparkles, X, 
   AlertCircle, CheckCircle2, RefreshCw, Wallet, CalendarDays 

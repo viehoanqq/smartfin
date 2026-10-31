@@ -1,17 +1,19 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/common/ProtectedRoute';
+import MainLayout from './layouts/MainLayout';
+
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
-import Settings from './pages/Profile';
-import Dashboard from './pages/Dashboard';
-import Transactions from './pages/Transactions';
-import ProtectedRoute from './components/ProtectedRoute';
-import AppLayout from './components/layout/AppLayout'; 
 import Error404 from './pages/Error404';
-import Savings from './pages/Savings';
-import SavingDetail from './pages/SavingDetail';
-import Wallets from './pages/Wallets';
+
+import Dashboard from './pages/customer/Dashboard';
+import Settings from './pages/customer/Profile';
+import Transactions from './pages/customer/Transactions';
+import Savings from './pages/customer/Savings';
+import SavingDetail from './pages/customer/SavingDetail';
+import Wallets from './pages/customer/Wallets';
 
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login/Register
 const RedirectIfAuthenticated = ({ children }) => {
@@ -51,11 +53,11 @@ export default function App() {
             } 
           />
 
-          {/* --- CÁC TRANG NỘI BỘ (ĐÃ ĐĂNG NHẬP - DÙNG CHUNG APPLAYOUT & PROTECTEDROUTE) --- */}
+          {/* --- CÁC TRANG NỘI BỘ (ĐÃ ĐĂNG NHẬP - DÙNG CHUNG MAINLAYOUT & PROTECTEDROUTE) --- */}
           <Route 
             element={
               <ProtectedRoute>
-                <AppLayout />
+                <MainLayout />
               </ProtectedRoute>
             }
           >

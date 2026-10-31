@@ -1,8 +1,8 @@
 import React from 'react';
-import OverviewCards from '../components/dashboard/OverviewCards';
-import TransactionList from '../components/dashboard/TransactionList';
-import WalletPanel from '../components/dashboard/WalletPanel';
-import TransactionForm from '../components/dashboard/TransactionForm';
+import OverviewCards from '../../components/customer/dashboard/OverviewCards';
+import TransactionList from '../../components/customer/dashboard/TransactionList';
+import WalletPanel from '../../components/customer/dashboard/WalletPanel';
+import TransactionForm from '../../components/customer/dashboard/TransactionForm';
 
 const Dashboard = () => {
   return (

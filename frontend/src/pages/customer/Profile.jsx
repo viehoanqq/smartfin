@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, Bell, Palette, Save, Loader2, CheckCircle, AlertTriangle } from 'lucide-react'; 
-import { userAPI } from '../api/userAPI'; 
-import ConfirmModal from '../components/common/ConfirmModal'; 
-import defaultAvatar from '../assets/imgs/avt-default.png'; 
+import { userAPI } from '../../services/userAPI'; 
+import ConfirmModal from '../../components/common/ConfirmModal'; 
+import defaultAvatar from '../../assets/imgs/avt-default.png'; 
 
 const Profile = () => {
   const [user, setUser] = useState(null);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Loader2, DollarSign, Tag, Calendar, FileText } from 'lucide-react';
-import { transactionAPI } from '../../api/transactionAPI';
-import { walletAPI } from '../../api/walletAPI';
+import { transactionAPI } from '../../../services/transactionAPI';
+import { walletAPI } from '../../../services/walletAPI';
 
 const CATEGORIES = [
   { id: 1, name: 'Ăn uống & Cà phê', type: 'expense' },

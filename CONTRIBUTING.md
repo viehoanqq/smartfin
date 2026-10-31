@@ -65,7 +65,9 @@ Sau khi đã push lên nhanh, hãy check CI và tạo pull request để đượ
 
 ### Frontend
 
-- Đặt màn hình trong `frontend/src/pages/`; dùng các thư mục dùng chung hiện có hoặc tạo module theo tính năng khi cần.
+- Đặt màn hình người dùng trong `frontend/src/pages/customer/`, màn hình quản trị trong `frontend/src/pages/admin/`; trang công khai (đăng nhập, đăng ký...) để ở `frontend/src/pages/`.
+- Component riêng của từng vai trò đặt trong `components/customer/` hoặc `components/admin/`; component dùng chung đặt trong `components/common/`.
+- Gọi API qua các module trong `frontend/src/services/`, không gọi `axios` trực tiếp trong component.
 - Giữ component dễ đọc và tách phần gọi API khỏi giao diện khi chức năng phát triển.
 - Xử lý trạng thái đang tải, dữ liệu rỗng và lỗi từ API.
 - Giữ nguyên `frontend/package-lock.json` đồng bộ với `frontend/package.json` khi thay đổi dependency.

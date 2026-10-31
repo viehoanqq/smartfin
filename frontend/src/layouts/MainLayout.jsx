@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom'; // Hoặc dùng { children } tùy cấu trúc router của bạn
 import { MessageSquare } from 'lucide-react';
-import Sidebar from './Sidebar';
-import Header from './Header';
-import ChatbotPanel from '../dashboard/ChatbotPanel';
-import { userAPI } from '../../api/userAPI';
+import Sidebar from '../components/customer/Sidebar';
+import Header from '../components/customer/Header';
+import ChatbotPanel from '../components/customer/dashboard/ChatbotPanel';
+import { userAPI } from '../services/userAPI';
 
-const AppLayout = () => {
+const MainLayout = () => {
   const [user, setUser] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -66,4 +66,4 @@ const AppLayout = () => {
   );
 };
 
-export default AppLayout;
+export default MainLayout;
