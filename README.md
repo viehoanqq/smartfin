@@ -158,13 +158,19 @@ app.include_router(example_api.router, prefix="/api/v1")  # GET /api/v1/example
 
 ### Thêm hoặc sửa giao diện frontend
 
-Frontend hiện khởi chạy từ `frontend/src/main.jsx`, render component trong `frontend/src/App.jsx` và dùng Axios để gọi API. Thư mục `frontend/src/pages/` hiện có sẵn nhưng các file trang còn trống; React Router đã có trong dependencies nhưng chưa được cấu hình trong ứng dụng.
+Frontend khởi chạy từ `frontend/src/main.jsx`; route khai báo trong `frontend/src/App.jsx` bằng React Router. Mã nguồn chia theo vai trò người dùng:
+
+- `pages/` – trang công khai (Login, Register, ForgotPassword, Error404); `pages/customer/` cho người dùng, `pages/admin/` cho quản trị.
+- `components/customer/`, `components/admin/` – component riêng của từng vai trò; `components/common/` dùng chung (ConfirmModal, ProtectedRoute).
+- `layouts/` – `MainLayout` (sidebar, header, chatbot của người dùng) và `AdminLayout`.
+- `services/` – gọi API; mọi request đi qua `axiosClient.js` (gắn token, xử lý 401).
+- `context/` – `AuthContext` giữ trạng thái đăng nhập.
 
 Khi thêm một màn hình:
 
-1. Tạo component trong `frontend/src/pages/` theo tính năng, ví dụ `Transactions.jsx`.
-2. Kết nối component với `App.jsx`; nếu cần điều hướng nhiều màn hình, cấu hình React Router tại `App.jsx`.
-3. Gọi API backend bằng Axios và xử lý riêng trạng thái đang tải, dữ liệu rỗng và lỗi. Khi thêm nhiều API, gom phần gọi API vào module dùng chung thay vì lặp URL và cấu hình trong các component.
+1. Tạo component trong `frontend/src/pages/customer/` hoặc `pages/admin/`, ví dụ `pages/customer/Budgets.jsx`.
+2. Khai báo route trong `App.jsx`, đặt bên trong route dùng `MainLayout` (hoặc `AdminLayout`).
+3. Gọi API qua module trong `frontend/src/services/` và xử lý riêng trạng thái đang tải, dữ liệu rỗng và lỗi; không gọi `axios` trực tiếp trong component.
 4. Tạo hoặc cập nhật style trong `frontend/src/` theo quy ước CSS hiện có.
 5. Kiểm tra trên trình duyệt, sau đó chạy các lệnh sau trong thư mục `frontend`:
 
@@ -247,13 +253,17 @@ smartfin/
 │   └── seed/                       # Dữ liệu mẫu
 ├── frontend/
 │   └── src/
-│       ├── api/
-│       ├── hooks/
-│       ├── stores/
+│       ├── services/               # Gọi API (axiosClient + từng module)
+│       ├── context/                # AuthContext
 │       ├── components/
-│       ├── layouts/
-│       ├── pages/                  # Dashboard, Transactions, Wallets,
-│       │                           # Budgets, Chat, Admin
+│       │   ├── admin/
+│       │   ├── customer/           # Header, Sidebar, dashboard/, transactions/
+│       │   └── common/             # ConfirmModal, ProtectedRoute
+│       ├── layouts/                # MainLayout, AdminLayout
+│       ├── pages/                  # Login, Register, ForgotPassword, Error404
+│       │   ├── customer/           # Dashboard, Transactions, Wallets, Savings,
+│       │   │                       # Budgets, Chat, Profile
+│       │   └── admin/
 │       └── utils/                  # Định dạng tiền tệ và ngày tháng
 └── ml/
     ├── data/                       # Ví dụ gán nhãn và tập kiểm thử

@@ -4,9 +4,9 @@ import {
   RotateCcw, ChevronLeft, ChevronRight, Calendar, 
   AlertTriangle, Loader2, X, Wallet, Tag, Clock, FileText, Sparkles
 } from 'lucide-react';
-import { userAPI } from '../api/userAPI';
-import { transactionAPI } from '../api/transactionAPI';
-import TransactionModal from '../components/dashboard/TransactionModal';
+import { userAPI } from '../../services/userAPI';
+import { transactionAPI } from '../../services/transactionAPI';
+import TransactionModal from '../../components/customer/dashboard/TransactionModal';
 
 const CATEGORY_NAMES = {
   1: 'Ăn uống & Cà phê',

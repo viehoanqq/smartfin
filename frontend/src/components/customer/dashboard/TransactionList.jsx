@@ -1,6 +1,6 @@
 import React from 'react';
 import { MoreHorizontal } from 'lucide-react';
-import { TRANSACTIONS } from '../../mock/dashboardData';
+import { TRANSACTIONS } from '../../../mock/dashboardData';
 
 const TransactionList = () => (
   <div>

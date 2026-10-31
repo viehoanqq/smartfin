@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSavingDetail, depositToSaving } from '../api/savingsAPI';
+import { getSavingDetail, depositToSaving } from '../../services/savingsAPI';
 import { 
   ArrowLeft, PiggyBank, Clock, 
   Wallet, History, PlusCircle, RefreshCw, LogOut, X, CheckCircle2, AlertCircle, ArrowUpRight
