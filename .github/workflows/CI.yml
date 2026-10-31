@@ -47,15 +47,18 @@ jobs:
         working-directory: ./backend
         env:
           DATABASE_URL: "postgresql+psycopg://postgres:password123@localhost:5434/smartfin_db"
+          TEST_DATABASE_URL: "postgresql+psycopg://postgres:password123@localhost:5434/smartfin_db"
           PYTHONPATH: .
         run: |
-          # Bật extension vector trước
-          export PGPASSWORD=password123
-          psql -h localhost -p 5434 -U postgres -d smartfin_db -c "CREATE EXTENSION IF NOT EXISTS vector;"
-          
-          # Chạy migration để sinh 16 bảng
+          # Chuỗi migration chỉ được có 1 head
+          test "$(alembic heads | wc -l)" -eq 1 || { alembic heads; echo "::error::Có nhiều hơn 1 alembic head"; exit 1; }
+
+          # Chạy migration để sinh 12 bảng (migration tự bật extension vector)
           alembic upgrade head
-          
+
+          # Model và migration phải khớp nhau
+          alembic check
+
           # Test API
           pytest -v
 

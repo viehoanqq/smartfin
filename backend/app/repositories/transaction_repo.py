@@ -16,13 +16,13 @@ def get_wallet_by_id(db: Session, wallet_id: int, user_id: int):
 def get_transaction_by_id(db: Session, txn_id: int, user_id: int, include_deleted: bool = False):
     query = db.query(Transaction).filter(Transaction.id == txn_id, Transaction.user_id == user_id)
     if not include_deleted:
-        query = query.filter(Transaction.deleted_at.is_(None))
+        query = query.filter(Transaction.delete_at.is_(None))
     return query.first()
 
 def get_user_transactions(db: Session, user_id: int, skip: int = 0, limit: int = 50):
     return (
         db.query(Transaction)
-        .filter(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
+        .filter(Transaction.user_id == user_id, Transaction.delete_at.is_(None))
         .order_by(Transaction.txn_date.desc())
         .offset(skip)
         .limit(limit)
@@ -112,7 +112,7 @@ def soft_delete_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet
         wallet.balance += revert_delta
         
         # 2. Đánh dấu xóa mềm
-        txn.deleted_at = func.now()
+        txn.delete_at = func.now()
 
         db.commit()
         return True
@@ -127,7 +127,7 @@ def restore_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, ap
         wallet.balance += apply_delta
         
         # 2. Gỡ đánh dấu xóa mềm
-        txn.deleted_at = None
+        txn.delete_at = None
 
         db.commit()
         db.refresh(txn)
@@ -150,7 +150,7 @@ def get_filtered_transactions(
 ):
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
-        Transaction.deleted_at.is_(None)
+        Transaction.delete_at.is_(None)
     )
 
     # Áp dụng các bộ lọc nếu có truyền lên
@@ -183,7 +183,7 @@ def get_filtered_transactions(
 
 def get_all_for_export(db: Session, user_id: int, from_date: Optional[date] = None, to_date: Optional[date] = None):
     """Lấy toàn bộ giao dịch (không phân trang) để xuất ra file CSV"""
-    query = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
+    query = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.delete_at.is_(None))
     if from_date:
         query = query.filter(func.date(Transaction.txn_date) >= from_date)
     if to_date:

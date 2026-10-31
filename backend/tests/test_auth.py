@@ -26,7 +26,6 @@ def test_1_register_user():
             "email": TEST_EMAIL,
             "password": TEST_PASSWORD,
             "full_name": "Người Dùng Test",
-            "currency": "VND",
             "monthly_income": 15000000
         }
     )

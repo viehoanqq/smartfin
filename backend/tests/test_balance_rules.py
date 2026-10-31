@@ -16,7 +16,7 @@ from app.repositories import transaction_repo
 
 
 def override_get_current_user():
-    return User(id=1, email="admin@gmail.com", full_name="Test", role="admin", currency="VND", monthly_income=0)
+    return User(id=1, email="admin@gmail.com", full_name="Test", role="admin", monthly_income=0)
 
 
 def override_get_db():
@@ -80,26 +80,26 @@ def test_update_saving_transaction_is_blocked(monkeypatch):
 def test_delete_saving_transaction_is_blocked(monkeypatch):
     wallet = Wallet(id=1, user_id=1, balance=8000000)
     txn = Transaction(id=30, user_id=1, wallet_id=1, category_id=17, type="saving", amount=2000000,
-                      txn_date=datetime.now(), source="manual", deleted_at=None)
+                      txn_date=datetime.now(), source="manual", delete_at=None)
     monkeypatch.setattr(transaction_repo, "get_wallet_by_id", lambda db, wallet_id, user_id: wallet)
     monkeypatch.setattr(transaction_repo, "get_transaction_by_id", lambda db, txn_id, user_id, include_deleted=False: txn)
     res = client.delete("/api/v1/transactions/30")
     assert res.status_code == 400
     assert wallet.balance == 8000000      # ví không bị thay đổi
-    assert txn.deleted_at is None
+    assert txn.delete_at is None
 
 
 def test_restore_saving_transaction_subtracts_from_wallet(monkeypatch):
     """Nếu một giao dịch tiết kiệm đã bị xóa mềm (do mục tiêu tiết kiệm), hoàn tác phải TRỪ ví, không cộng"""
     wallet = Wallet(id=1, user_id=1, balance=10000000)
     txn = Transaction(id=31, user_id=1, wallet_id=1, category_id=17, type="saving", amount=2000000,
-                      txn_date=datetime.now(), source="manual", deleted_at=datetime.now())
+                      txn_date=datetime.now(), source="manual", delete_at=datetime.now())
     monkeypatch.setattr(transaction_repo, "get_wallet_by_id", lambda db, wallet_id, user_id: wallet)
     monkeypatch.setattr(transaction_repo, "get_transaction_by_id", lambda db, txn_id, user_id, include_deleted=False: txn)
     res = client.post("/api/v1/transactions/31/restore")
     assert res.status_code == 200
     assert wallet.balance == 8000000
-    assert txn.deleted_at is None
+    assert txn.delete_at is None
 
 
 def test_filter_transactions_by_saving_type(monkeypatch):

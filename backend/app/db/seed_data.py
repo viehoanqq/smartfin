@@ -53,17 +53,13 @@ def seed_database():
         db.add(user)
         db.flush()
 
-        # 3. Ví (balance sẽ được tính lại từ giao dịch ở bước 8)
-        wallets = {
-            "cash": Wallet(user_id=user.id, name="Ví Tiền Mặt", type="cash", initial_balance=2_000_000, balance=0),
-            "bank": Wallet(user_id=user.id, name="Techcombank Chính", type="bank", initial_balance=10_000_000, balance=0),
-            "momo": Wallet(user_id=user.id, name="Ví MoMo", type="e-wallet", initial_balance=1_000_000, balance=0),
-        }
-        db.add_all(wallets.values())
+        # 3. Ví (1 user - 1 ví; balance sẽ được tính lại từ giao dịch ở bước 8)
+        wallet = Wallet(user_id=user.id, name="Ví chính", type="cash", initial_balance=5_000_000, balance=0)
+        db.add(wallet)
         db.flush()
 
         # 4. Ngân sách (mỗi người 1 ngân sách cho mỗi danh mục)
-        budget_coffee = Budget(user_id=user.id, category_id=cats["Cà phê & đồ uống"],
+        budget_coffee = Budget(user_id=user.id, category_id=cats["Ăn uống"],
                                budget_amount=1_000_000, current_amount=0, alert_sent_level=0)
         budget_move = Budget(user_id=user.id, category_id=cats["Di chuyển"],
                              budget_amount=800_000, current_amount=0, alert_sent_level=0)
@@ -77,22 +73,23 @@ def seed_database():
         db.flush()
         contribution = GoalContribution(goal_id=goal.id, amount=10_000_000)
         db.add(contribution)
+        goal.current_amount = contribution.amount
         db.flush()
 
         # 6. Giao dịch (income | expense | saving)
         now = datetime.now().astimezone()
         txns = [
-            Transaction(user_id=user.id, wallet_id=wallets["bank"].id, category_id=cats["Lương"],
+            Transaction(user_id=user.id, wallet_id=wallet.id, category_id=cats["Lương"],
                         type="income", amount=15_000_000, txn_date=now - timedelta(days=15),
                         note="Nhận lương tháng 10", source="manual"),
-            Transaction(user_id=user.id, wallet_id=wallets["bank"].id, category_id=cats["Tiết kiệm"],
+            Transaction(user_id=user.id, wallet_id=wallet.id, category_id=cats["Tiết kiệm"],
                         type="saving", amount=10_000_000, txn_date=now - timedelta(days=14),
                         note="Nạp mục tiêu laptop", source="manual",
                         goal_contributions_id=contribution.id),
-            Transaction(user_id=user.id, wallet_id=wallets["cash"].id, category_id=cats["Cà phê & đồ uống"],
+            Transaction(user_id=user.id, wallet_id=wallet.id, category_id=cats["Ăn uống"],
                         type="expense", amount=45_000, txn_date=now - timedelta(days=3),
                         note="Uống cafe sữa đá với bạn", source="manual", budget_id=budget_coffee.id),
-            Transaction(user_id=user.id, wallet_id=wallets["momo"].id, category_id=cats["Di chuyển"],
+            Transaction(user_id=user.id, wallet_id=wallet.id, category_id=cats["Di chuyển"],
                         type="expense", amount=120_000, txn_date=now - timedelta(days=2),
                         note="Đổ xăng xe máy", source="nlp", raw_text="đổ xăng 120k momo",
                         ai_confidence=0.93, budget_id=budget_move.id),
@@ -104,11 +101,9 @@ def seed_database():
         budget_move.current_amount = 120_000
 
         # 8. BR01: số dư = ban đầu + thu - chi - tiết kiệm
-        for t in txns:
-            w = next(w for w in wallets.values() if w.id == t.wallet_id)
-            w.balance = (w.balance or 0) + (t.amount if t.type == "income" else -t.amount)
-        for w in wallets.values():
-            w.balance += w.initial_balance
+        wallet.balance = wallet.initial_balance + sum(
+            t.amount if t.type == "income" else -t.amount for t in txns
+        )
 
         # 9. Chat mẫu
         session = ChatSession(user_id=user.id, title="Tư vấn chi tiêu tháng 10")

@@ -20,7 +20,6 @@ def override_get_current_user():
         email="admin@gmail.com",
         full_name="Nguyễn Việt Hoàng",
         role="admin",
-        currency="VND",
         monthly_income=5000000
     )
 
@@ -146,7 +145,7 @@ def test_soft_delete_and_restore_transaction(monkeypatch):
     mock_wallet = Wallet(id=1, user_id=1, balance=900000)
     existing_txn = Transaction(
         id=20, user_id=1, wallet_id=1, category_id=2,
-        type="expense", amount=100000, txn_date=datetime.now(), source="manual", deleted_at=None
+        type="expense", amount=100000, txn_date=datetime.now(), source="manual", delete_at=None
     )
 
     monkeypatch.setattr(transaction_repo, "get_wallet_by_id", lambda db, wallet_id, user_id: mock_wallet)
@@ -161,14 +160,14 @@ def test_soft_delete_and_restore_transaction(monkeypatch):
     assert res_delete.status_code == 200
     # Sau khi xóa khoản chi 100k, tiền trong ví phải được cộng trả lại lên 1.000.000đ
     assert mock_wallet.balance == 1000000
-    assert existing_txn.deleted_at is not None
+    assert existing_txn.delete_at is not None
 
     # --- BƯỚC 2: BẤM HOÀN TÁC (RESTORE) ---
     res_restore = client.post("/api/v1/transactions/20/restore")
     assert res_restore.status_code == 200
-    # Khôi phục lại giao dịch thì ví phải bị trừ lại 100k -> Về 900.000đ, deleted_at về None
+    # Khôi phục lại giao dịch thì ví phải bị trừ lại 100k -> Về 900.000đ, delete_at về None
     assert mock_wallet.balance == 900000
-    assert existing_txn.deleted_at is None
+    assert existing_txn.delete_at is None
     
 def test_get_transactions_filtered_and_paginated(monkeypatch):
     """Test API lấy danh sách giao dịch có lọc đa điều kiện và phân trang"""

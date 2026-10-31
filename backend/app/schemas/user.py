@@ -8,7 +8,6 @@ class UserCreate(BaseModel):
     full_name: str
     phone_number: Optional[str] = None
     date_of_birth: Optional[date] = None
-    currency: Optional[str] = "VND"
     monthly_income: Optional[int] = 0
 
 class UserResponse(BaseModel):
@@ -16,7 +15,6 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     role: str
-    currency: Optional[str] = "VND"
     monthly_income: Optional[int] = 0
     # --- THÊM 3 DÒNG NÀY ---
     phone_number: Optional[str] = None
@@ -29,5 +27,4 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     date_of_birth: Optional[date] = None
-    currency: Optional[str] = None
     monthly_income: Optional[int] = None

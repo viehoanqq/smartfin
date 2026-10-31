@@ -20,7 +20,6 @@ def override_get_current_user():
         email="admin@gmail.com",
         full_name="Nguyễn Việt Hoàng",
         role="admin",
-        currency="VND",
         monthly_income=5000000,
         phone_number="0987654321",
         date_of_birth=date(2004, 8, 16),

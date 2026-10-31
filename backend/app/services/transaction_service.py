@@ -104,7 +104,7 @@ class TransactionService:
     @staticmethod
     def restore_transaction(db: Session, user_id: int, txn_id: int):
         txn = transaction_repo.get_transaction_by_id(db, txn_id, user_id, include_deleted=True)
-        if not txn or txn.deleted_at is None:
+        if not txn or txn.delete_at is None:
             raise HTTPException(status_code=404, detail="Giao dịch không tồn tại hoặc chưa bị xóa")
 
         wallet = transaction_repo.get_wallet_by_id(db, txn.wallet_id, user_id)

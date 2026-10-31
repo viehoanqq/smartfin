@@ -21,7 +21,6 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         email=user_in.email,
         password_hash=get_password_hash(user_in.password),
         full_name=user_in.full_name,
-        currency=user_in.currency,
         monthly_income=user_in.monthly_income,
         role="user"
     )
@@ -41,8 +40,6 @@ def update_user_profile(db: Session, user: User, user_in: UserUpdate) -> User:
     """Cập nhật thông tin hồ sơ người dùng"""
     if user_in.full_name is not None:
         user.full_name = user_in.full_name
-    if user_in.currency is not None:
-        user.currency = user_in.currency
     if user_in.monthly_income is not None:
         user.monthly_income = user_in.monthly_income
         

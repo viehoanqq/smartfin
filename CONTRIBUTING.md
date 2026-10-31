@@ -79,7 +79,11 @@ Sau khi đã push lên nhanh, hãy check CI và tạo pull request để đượ
 alembic revision --autogenerate -m "describe_schema_change"
 ```
 
-- Rà soát thủ công cả `upgrade()` và `downgrade()` trong migration được tạo. Không chỉnh sửa migration đã được áp dụng hoặc chia sẻ; hãy tạo migration mới.
+- Luôn `git pull origin main` và `alembic upgrade head` **trước** khi chạy `alembic revision`, để `down_revision` trỏ đúng migration mới nhất trên `main`. Migration sinh từ một revision chỉ có trên máy mình sẽ làm đứt chuỗi migration của cả nhóm.
+- Rà soát thủ công cả `upgrade()` và `downgrade()` trong migration được tạo. Không chỉnh sửa, đổi tên hoặc xóa migration đã có trên `main`; hãy tạo migration mới.
+- Trước khi push, `alembic heads` phải chỉ có 1 dòng và `alembic check` phải báo `No new upgrade operations detected.` CI cũng kiểm tra hai điều này.
+- Nếu merge `main` vào nhánh của mình mà `alembic heads` ra 2 dòng, sửa `down_revision` của migration bên mình trỏ vào head của `main` rồi chạy lại `alembic upgrade head`.
+- Không commit file dump database (`*.sql`).
 - Tránh thao tác làm mất dữ liệu ngoài dự kiến. Nếu thay đổi có nguy cơ ảnh hưởng dữ liệu hiện có, nêu rõ trong pull request và chuẩn bị cách chuyển đổi an toàn.
 
 ### Thay đổi tài liệu

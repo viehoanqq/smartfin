@@ -49,14 +49,33 @@ DATABASE_URL=postgresql+psycopg://postgres:<mat_khau>@localhost:5434/smartfin_db
 
 Thay `<mat_khau>` bằng mật khẩu cấu hình cho PostgreSQL ở môi trường của bạn. Không dùng thông tin đăng nhập phát triển trong môi trường production.
 
-Áp dụng schema và khởi động API:
+Áp dụng schema, nạp dữ liệu demo và khởi động API:
 
 ```powershell
 alembic upgrade head
+python -m app.db.seed_data
 uvicorn main:app --reload
 ```
 
+Migration đầu tiên đã tạo sẵn 17 danh mục mặc định. Lệnh seed tạo thêm tài khoản demo `hoang123@gmail.com` / `123456`; chạy lại nhiều lần không bị trùng.
+
 Backend mặc định chạy tại `http://localhost:8000`.
+
+#### Lỗi `Can't locate revision identified by '...'`
+
+DB của bạn được tạo từ migration cũ đã bị gộp vào `0001_init_schema`. Reset DB một lần (xóa toàn bộ dữ liệu trong `DATABASE_URL`, tạo lại bảng và dữ liệu demo):
+
+```powershell
+cd backend
+python scripts/reset_db.py
+```
+
+Cần giữ dữ liệu thì sao lưu trước:
+
+```powershell
+docker exec smartfin_db pg_dump -U postgres -f /tmp/backup.sql smartfin_db
+docker cp smartfin_db:/tmp/backup.sql E:\smartfin_backup.sql
+```
 
 ### 3. Cài đặt và chạy frontend
 
@@ -106,22 +125,33 @@ Khi thêm một API:
 1. Xác định dữ liệu đầu vào/đầu ra và phương thức HTTP; dùng Pydantic để kiểm tra dữ liệu request và định nghĩa response.
 2. Viết endpoint bằng FastAPI. Với endpoint cần cơ sở dữ liệu, dùng dependency `get_db` từ `app.db.session` thay vì tự tạo kết nối trong endpoint.
 3. Thực hiện truy vấn và nghiệp vụ bằng SQLAlchemy; không trả trực tiếp thông tin nhạy cảm như `password_hash`.
-4. Đăng ký endpoint trong `backend/main.py`. Khi số lượng endpoint tăng, có thể tách router theo tính năng rồi đăng ký router tại đây; `backend/app/api/v1/routers/` trong cây mục tiêu hiện chưa được tạo.
+4. Viết endpoint trong router theo tính năng dưới `backend/app/api/v1/routers/`, rồi đăng ký router trong `backend/main.py` với `prefix="/api/v1"`.
 5. Chạy backend và kiểm tra endpoint tại `http://localhost:8000/docs`, đồng thời kiểm tra kết nối database qua `GET /api/health`.
 
-Ví dụ endpoint mới có thể được bắt đầu trực tiếp trong `backend/main.py`:
+Ví dụ router mới `backend/app/api/v1/routers/example_api.py`:
 
 ```python
+from fastapi import APIRouter
 from pydantic import BaseModel
+
+router = APIRouter(prefix="/example", tags=["Example"])
 
 
 class ExampleResponse(BaseModel):
     message: str
 
 
-@app.get("/api/example", response_model=ExampleResponse)
+@router.get("", response_model=ExampleResponse)
 def get_example():
     return {"message": "SmartFin API"}
+```
+
+Đăng ký trong `backend/main.py`:
+
+```python
+from app.api.v1.routers import example_api
+
+app.include_router(example_api.router, prefix="/api/v1")  # GET /api/v1/example
 ```
 
 Đây chỉ là ví dụ cấu trúc endpoint; với tính năng thực tế, hãy bổ sung schema, truy vấn, xử lý lỗi và kiểm thử phù hợp.
@@ -150,7 +180,7 @@ Nếu thêm origin frontend khác `http://localhost:5173`, cập nhật cấu h�
 Các bước dưới đây áp dụng khi thêm bảng, cột, index hoặc quan hệ:
 
 1. Sửa hoặc thêm SQLAlchemy model trong `backend/app/models/domain.py`. Alembic nạp metadata qua `backend/app/models/__init__.py`; nếu tạo module model mới, cần import module đó ở đây để model được đăng ký với `Base.metadata`.
-2. Đảm bảo PostgreSQL đang chạy và `DATABASE_URL` trong `backend/.env` trỏ tới đúng database.
+2. Đảm bảo PostgreSQL đang chạy và `DATABASE_URL` trong `backend/.env` trỏ tới đúng database. `git pull` nhánh `main` và chạy `alembic upgrade head` trước, để migration mới nối tiếp đúng migration mới nhất.
 3. Từ thư mục `backend`, tạo migration:
 
 ```powershell
@@ -163,6 +193,8 @@ alembic revision --autogenerate -m "describe_schema_change"
 ```powershell
 alembic upgrade head
 alembic current
+alembic heads   # phải chỉ có 1 dòng
+alembic check   # "No new upgrade operations detected." = model và migration khớp
 ```
 
 Không sửa migration đã được áp dụng/chia sẻ; hãy tạo migration mới. Chỉ dùng `alembic downgrade -1` để hoàn tác khi đã xác nhận migration có thể đảo ngược và dữ liệu cần giữ không bị mất.
