@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, getHomePath  } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 
@@ -15,10 +15,17 @@ import Savings from './pages/customer/Savings';
 import SavingDetail from './pages/customer/SavingDetail';
 import Wallets from './pages/customer/Wallets';
 
+
+
+import AdminLayout from './layouts/AdminLayout';
+import AdminDashboard from './pages/admin/Dashboard';
+
+
 // Component phụ để chặn người dùng đã đăng nhập quay lại trang Login/Register
 const RedirectIfAuthenticated = ({ children }) => {
   const { user } = useAuth();
-  if (user) return <Navigate to="/" replace />;
+    if (user) return <Navigate to={getHomePath(user)} replace />;
+
   return children;
 };
 
@@ -56,7 +63,8 @@ export default function App() {
           {/* --- CÁC TRANG NỘI BỘ (ĐÃ ĐĂNG NHẬP - DÙNG CHUNG MAINLAYOUT & PROTECTEDROUTE) --- */}
           <Route 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['user']}>
+
                 <MainLayout />
               </ProtectedRoute>
             }
@@ -69,6 +77,21 @@ export default function App() {
             <Route path="/savings/:id" element={<SavingDetail />} />
             <Route path="/wallets" element={<Wallets />} /> 
           </Route>
+          
+
+          {/* --- TRANG QUẢN TRỊ --- */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            {/* sau này: <Route path="users" element={<AdminUsers />} /> -> /admin/users */}
+          </Route>
+          
 
           {/* Bắt lỗi đường dẫn sai 404 */}
           <Route path="*" element={<Error404 />} />

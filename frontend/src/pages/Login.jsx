@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth,getHomePath  } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -18,8 +18,8 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      await login(loginEmail, loginPassword);
-      navigate('/'); 
+      const me = await login(loginEmail, loginPassword);
+      navigate(getHomePath(me), { replace: true });
     } catch (err) {
       setError(err.response?.data?.detail || 'Sai email hoặc mật khẩu.');
     } finally {

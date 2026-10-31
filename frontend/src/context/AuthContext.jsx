@@ -32,6 +32,8 @@ export const AuthProvider = ({ children }) => {
     // Sau khi có token, gọi ngay API lấy thông tin user
     const userData = await authApi.getMe();
     setUser(userData);
+    return userData;          // ← thêm dòng này
+
   };
 
   // Hàm xử lý Đăng xuất
@@ -48,3 +50,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+export const getHomePath = (user) => (user?.role === 'admin' ? '/admin' : '/');
+
