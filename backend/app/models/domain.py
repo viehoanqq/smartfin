@@ -112,8 +112,13 @@ class Transaction(Base):
     wallet_id = Column(BigInteger, ForeignKey("wallets.id", ondelete="RESTRICT"), nullable=False)
     category_id = Column(BigInteger, ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False)
     budget_id = Column(BigInteger, ForeignKey("budgets.id", ondelete="SET NULL"), nullable=True)
+<<<<<<< refs/remotes/origin/minh
     goal_contributions_id = Column(BigInteger, ForeignKey("goal_contributions.id", ondelete="SET NULL"), nullable=True)
     type = Column(String(10), nullable=False)  # income | expense | saving
+=======
+    # goal_contributions_id = Column(BigInteger, ForeignKey("goal_contributions.id", ondelete="SET NULL"), nullable=True)
+    type = Column(String(50), nullable=False)  # income | expense | saving
+>>>>>>> local
     amount = Column(BigInteger, nullable=False)
     txn_date = Column(DateTime(timezone=True), server_default=func.now())
     note = Column(Text)
@@ -142,6 +147,7 @@ class GoalContribution(Base):
     __tablename__ = "goal_contributions"
     id = Column(BigInteger, primary_key=True, index=True)
     goal_id = Column(BigInteger, ForeignKey("saving_goals.id", ondelete="CASCADE"), nullable=False)
+    transactions_id = Column(BigInteger, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False)
     amount = Column(BigInteger, nullable=False)
     contributed_at = Column(DateTime(timezone=True), server_default=func.now())
     goal = relationship("SavingGoal", back_populates="contributions")

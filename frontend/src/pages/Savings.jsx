@@ -1,84 +1,54 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< refs/remotes/origin/minh:frontend/src/pages/Savings.jsx
 import { getSavings, createSavingGoal } from '../api/savingsAPI';
+=======
+import axios from 'axios';
+>>>>>>> local:frontend/src/pages/customer/Savings.jsx
 import { 
   PiggyBank, Plus, Clock, Target, Sparkles, X, 
-  AlertCircle, CheckCircle2, RefreshCw, Wallet, CalendarDays 
+  AlertCircle, CheckCircle2, RefreshCw, Wallet, Ban 
 } from 'lucide-react';
 
 export default function Savings() {
   const navigate = useNavigate();
 
-  // Mock Data test giao diện
-  const [goals, setGoals] = useState([
-    {
-      id: 1,
-      name: "Mua iPhone 18 Pro Max",
-      target_amount: 35000000,
-      current_amount: 24500000,
-      duration_value: 1,
-      period: "thang",
-      status: "active",
-      created_at: "2026-09-10T08:30:00Z" // Quá hạn
-    },
-    {
-      id: 2,
-      name: "Du lịch Nhật Bản",
-      target_amount: 50000000,
-      current_amount: 50000000,
-      duration_value: 1,
-      period: "nam",
-      status: "completed",
-      created_at: "2026-01-10T10:15:00Z" // Đã hoàn thành
-    },
-    {
-      id: 3,
-      name: "Mua xe máy mới",
-      target_amount: 45000000,
-      current_amount: 12000000,
-      duration_value: 12,
-      period: "thang",
-      status: "active",
-      created_at: "2026-09-01T14:20:00Z" // Đang tích lũy (Tháng)
-    },
-    {
-      id: 4,
-      name: "Quỹ mua nhà đất",
-      target_amount: 1000000000,
-      current_amount: 250000000,
-      duration_value: 5,
-      period: "nam",
-      status: "active",
-      created_at: "2026-02-01T09:00:00Z" // Đang tích lũy (Năm)
-    }
-  ]);
-
-  const [activeTab, setActiveTab] = useState('active'); // 'active', 'expired', 'completed'
+  const [goals, setGoals] = useState([]);
+  const [activeTab, setActiveTab] = useState('active'); // 'active', 'expired', 'completed', 'cancelled'
   const [periodFilter, setPeriodFilter] = useState('all'); // 'all', 'thang', 'nam'
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
   // Form states cho tạo hũ mới
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
-  const [durationValue, setDurationValue] = useState(6);
-  const [period, setPeriod] = useState('thang');
+  const [durationValue, setDurationValue] = useState(1);
+  const [period, setPeriod] = useState('nam');
 
+  // Lấy dữ liệu thật từ Backend FastAPI
   const fetchGoals = async () => {
     try {
       setLoading(true);
-      const data = await getSavings();
-      if (data) setGoals(data);
+      const token = localStorage.getItem('access_token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const response = await axios.get('http://localhost:8000/api/v1/savings', { headers });
+      
+      if (Array.isArray(response.data)) {
+        setGoals(response.data);
+      } else if (response.data && Array.isArray(response.data.data)) {
+        setGoals(response.data.data);
+      }
     } catch (error) {
       console.error('Lỗi tải mục tiêu tiết kiệm:', error);
+      setGoals([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Bỏ comment khi chạy API thật từ Database
-    // fetchGoals();
+    fetchGoals();
   }, []);
 
   const getDueDate = (createdAtStr, durationValue, period) => {
@@ -92,7 +62,7 @@ export default function Savings() {
     return date;
   };
 
-  // Phân loại và Sắp xếp
+  // Phân loại và Sắp xếp từ dữ liệu thật
   const categorizedGoals = useMemo(() => {
     const now = new Date();
     const sorted = [...goals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -100,46 +70,60 @@ export default function Savings() {
     const activeList = [];
     const expiredList = [];
     const completedList = [];
+    const cancelledList = [];
 
     sorted.forEach((goal) => {
-      // Áp dụng bộ lọc Theo Tháng / Theo Năm
       if (periodFilter !== 'all' && goal.period !== periodFilter) {
         return;
       }
 
+      const rawStatus = (goal.status || '').toLowerCase();
       const current = goal.current_amount || 0;
-      const isCompleted = goal.status === 'completed' || current >= goal.target_amount;
+      const isCancelled = rawStatus === 'cancelled' || rawStatus === 'failed';
+      const isCompleted = !isCancelled && (rawStatus === 'completed' || current >= goal.target_amount);
       const dueDate = getDueDate(goal.created_at, goal.duration_value, goal.period);
-      const isExpired = !isCompleted && goal.status !== 'failed' && dueDate && dueDate < now;
+      const isExpired = !isCancelled && !isCompleted && dueDate && dueDate < now;
 
-      if (isCompleted) {
+      if (isCancelled) {
+        cancelledList.push({ ...goal, computedStatus: 'cancelled' });
+      } else if (isCompleted) {
         completedList.push({ ...goal, computedStatus: 'completed' });
       } else if (isExpired) {
         expiredList.push({ ...goal, computedStatus: 'expired' });
-      } else if (goal.status === 'active') {
+      } else {
         activeList.push({ ...goal, computedStatus: 'active' });
       }
     });
 
-    return { active: activeList, expired: expiredList, completed: completedList };
+    return {
+      active: activeList,
+      expired: expiredList,
+      completed: completedList,
+      cancelled: cancelledList,
+    };
   }, [goals, periodFilter]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await createSavingGoal({
+      const token = localStorage.getItem('access_token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      await axios.post('http://localhost:8000/api/v1/savings', {
         name,
         target_amount: Number(targetAmount),
         period,
         duration_value: Number(durationValue),
-      });
+      }, { headers });
+
       setShowModal(false);
       setName('');
       setTargetAmount('');
-      setDurationValue(6);
-      setPeriod('thang');
+      setDurationValue(1);
+      setPeriod('nam');
       fetchGoals();
     } catch (error) {
+      console.error('Lỗi tạo mục tiêu:', error);
       alert('Tạo mục tiêu thất bại!');
     }
   };
@@ -151,9 +135,19 @@ export default function Savings() {
 
   const currentDisplayGoals = categorizedGoals[activeTab] || [];
 
+  // Tính số tiền cần tiết kiệm hàng tháng dự kiến trong Modal
+  const calculatedMonthlySaving = useMemo(() => {
+    const target = Number(targetAmount) || 0;
+    const duration = Number(durationValue) || 1;
+    if (target <= 0 || duration <= 0) return 0;
+    const totalMonths = period === 'nam' ? duration * 12 : duration;
+    return Math.round(target / totalMonths);
+  }, [targetAmount, durationValue, period]);
+
   return (
-    <div className="w-full min-h-screen text-white space-y-6">
-      {/* Header Bar */}
+    <main className="flex-1 p-6 md:p-8 max-w-[1800px] mx-auto w-full text-white relative space-y-6">
+      
+      {/* Header Bar - Đồng bộ chuẩn kích thước với trang Giao dịch */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1e2330]/60 p-6 rounded-2xl border border-[#252836] backdrop-blur-md">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-400">
@@ -161,24 +155,25 @@ export default function Savings() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Mục Tiêu Tiết Kiệm</h1>
+            <p className="text-gray-400 text-xs sm:text-sm mt-0.5">Quản lý các hũ tích lũy tài chính và theo dõi tiến độ</p>
           </div>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition duration-200 shadow-lg shadow-blue-500/20 active:scale-[0.98]"
+          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition duration-200 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
         >
           <Plus size={18} /> Tạo mục tiết kiệm
         </button>
       </div>
 
-      {/* Tabs Filter theo Trạng thái & Chu kỳ */}
+      {/* Tabs Filter theo Trạng thái & Chu kỳ - Canh lề chuẩn */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-[#252836] gap-4 pb-3">
         {/* Tab Trạng thái */}
-        <div className="flex gap-2 sm:gap-6 text-sm font-medium">
+        <div className="flex flex-wrap gap-2 sm:gap-6 text-sm font-medium">
           <button
             onClick={() => setActiveTab('active')}
-            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 ${
+            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 cursor-pointer ${
               activeTab === 'active'
                 ? 'border-blue-500 text-blue-400 font-bold'
                 : 'border-transparent text-gray-400 hover:text-gray-200'
@@ -189,7 +184,7 @@ export default function Savings() {
 
           <button
             onClick={() => setActiveTab('expired')}
-            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 ${
+            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 cursor-pointer ${
               activeTab === 'expired'
                 ? 'border-rose-500 text-rose-400 font-bold'
                 : 'border-transparent text-gray-400 hover:text-gray-200'
@@ -200,7 +195,7 @@ export default function Savings() {
 
           <button
             onClick={() => setActiveTab('completed')}
-            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 ${
+            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 cursor-pointer ${
               activeTab === 'completed'
                 ? 'border-emerald-500 text-emerald-400 font-bold'
                 : 'border-transparent text-gray-400 hover:text-gray-200'
@@ -208,13 +203,24 @@ export default function Savings() {
           >
             <CheckCircle2 size={16} /> Đã hoàn thành ({categorizedGoals.completed.length})
           </button>
+
+          <button
+            onClick={() => setActiveTab('cancelled')}
+            className={`pb-1 px-2 flex items-center gap-2 transition border-b-2 cursor-pointer ${
+              activeTab === 'cancelled'
+                ? 'border-gray-400 text-gray-200 font-bold'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            <Ban size={16} /> Đã hủy ({categorizedGoals.cancelled.length})
+          </button>
         </div>
 
         {/* Sub-Filter: Phân loại Theo Tháng / Theo Năm */}
         <div className="flex items-center gap-1.5 bg-[#141721] p-1 rounded-xl border border-[#252836] text-xs self-start md:self-auto">
           <button
             onClick={() => setPeriodFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition font-medium ${
+            className={`px-3 py-1.5 rounded-lg transition font-medium cursor-pointer ${
               periodFilter === 'all'
                 ? 'bg-[#252836] text-white shadow-sm font-bold'
                 : 'text-gray-400 hover:text-white'
@@ -224,7 +230,7 @@ export default function Savings() {
           </button>
           <button
             onClick={() => setPeriodFilter('thang')}
-            className={`px-3 py-1.5 rounded-lg transition font-medium ${
+            className={`px-3 py-1.5 rounded-lg transition font-medium cursor-pointer ${
               periodFilter === 'thang'
                 ? 'bg-blue-600/30 text-blue-400 border border-blue-500/30 font-bold'
                 : 'text-gray-400 hover:text-white'
@@ -234,7 +240,7 @@ export default function Savings() {
           </button>
           <button
             onClick={() => setPeriodFilter('nam')}
-            className={`px-3 py-1.5 rounded-lg transition font-medium ${
+            className={`px-3 py-1.5 rounded-lg transition font-medium cursor-pointer ${
               periodFilter === 'nam'
                 ? 'bg-purple-600/30 text-purple-400 border border-purple-500/30 font-bold'
                 : 'text-gray-400 hover:text-white'
@@ -280,6 +286,7 @@ export default function Savings() {
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`p-2.5 rounded-xl border ${
+                        goal.computedStatus === 'cancelled' ? 'bg-gray-500/10 border-gray-500/20 text-gray-400' :
                         goal.computedStatus === 'completed' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                         goal.computedStatus === 'expired' ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
                         'bg-blue-500/10 border-blue-500/20 text-blue-400'
@@ -295,7 +302,6 @@ export default function Savings() {
                             <Clock size={12} /> Hạn: {formatDate(dueDate)}
                           </span>
                           <span>•</span>
-                          {/* Tag hiển thị Tháng / Năm */}
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                             goal.period === 'nam' 
                               ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' 
@@ -307,15 +313,17 @@ export default function Savings() {
                       </div>
                     </div>
 
-                    {/* Badge trạng thái */}
                     <span className={`text-[11px] font-semibold px-3 py-1 rounded-full border ${
-                      goal.computedStatus === 'completed'
+                      goal.computedStatus === 'cancelled'
+                        ? 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                        : goal.computedStatus === 'completed'
                         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                         : goal.computedStatus === 'expired'
                         ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                         : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                     }`}>
-                      {goal.computedStatus === 'completed' ? 'Đã hoàn thành' :
+                      {goal.computedStatus === 'cancelled' ? 'Đã hủy' :
+                       goal.computedStatus === 'completed' ? 'Đã hoàn thành' :
                        goal.computedStatus === 'expired' ? 'Quá hạn' : 'Đang tích lũy'}
                     </span>
                   </div>
@@ -325,6 +333,7 @@ export default function Savings() {
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-400 font-medium">Tiến độ</span>
                       <span className={`font-bold text-sm ${
+                        goal.computedStatus === 'cancelled' ? 'text-gray-400' :
                         goal.computedStatus === 'completed' ? 'text-emerald-400' :
                         goal.computedStatus === 'expired' ? 'text-rose-400' : 'text-blue-400'
                       }`}>{percent}%</span>
@@ -332,7 +341,9 @@ export default function Savings() {
                     <div className="w-full bg-[#141721] h-3 rounded-full overflow-hidden p-0.5 border border-[#252836]">
                       <div
                         className={`h-full rounded-full transition-all duration-700 ${
-                          goal.computedStatus === 'completed'
+                          goal.computedStatus === 'cancelled'
+                            ? 'bg-gray-600'
+                            : goal.computedStatus === 'completed'
                             ? 'bg-gradient-to-r from-emerald-500 to-green-400'
                             : goal.computedStatus === 'expired'
                             ? 'bg-gradient-to-r from-rose-600 to-red-500'
@@ -356,11 +367,10 @@ export default function Savings() {
                   </div>
                 </div>
 
-                {/* Nút nhấn chuyển hướng sang chi tiết */}
                 {goal.computedStatus === 'active' && (
                   <button
-                    onClick={() => navigate(`/savings/${goal.id}`)}
-                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-blue-500/20"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/savings/${goal.id}`); }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-blue-500/20 cursor-pointer"
                   >
                     <Wallet size={16} /> Nạp tiền
                   </button>
@@ -368,8 +378,8 @@ export default function Savings() {
 
                 {goal.computedStatus === 'expired' && (
                   <button
-                    onClick={() => navigate(`/savings/${goal.id}`)}
-                    className="w-full py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-rose-500/20"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/savings/${goal.id}`); }}
+                    className="w-full py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition shadow-md shadow-rose-500/20 cursor-pointer"
                   >
                     <RefreshCw size={16} /> Gia hạn mục tiêu
                   </button>
@@ -377,10 +387,19 @@ export default function Savings() {
 
                 {goal.computedStatus === 'completed' && (
                   <button
-                    onClick={() => navigate(`/savings/${goal.id}`)}
-                    className="w-full py-2.5 bg-[#252836] hover:bg-[#2e3346] text-gray-200 hover:text-white border border-[#32374a] rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5 transition"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/savings/${goal.id}`); }}
+                    className="w-full py-2.5 bg-[#252836] hover:bg-[#2e3346] text-gray-200 hover:text-white border border-[#32374a] rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     Đã hoàn thành
+                  </button>
+                )}
+
+                {goal.computedStatus === 'cancelled' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/savings/${goal.id}`); }}
+                    className="w-full py-2.5 bg-[#141721] hover:bg-[#1a1e2b] text-gray-400 border border-[#252836] rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Ban size={15} /> Đã hủy
                   </button>
                 )}
               </div>
@@ -393,7 +412,7 @@ export default function Savings() {
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-[#1e2330] p-6 sm:p-8 rounded-2xl w-full max-w-md border border-[#252836] shadow-2xl relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white"><X size={20} /></button>
+            <button onClick={() => setShowModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white cursor-pointer"><X size={20} /></button>
             <div className="flex items-center gap-3 mb-6 text-blue-400">
               <PiggyBank size={24} />
               <h2 className="text-xl font-bold text-white">Tạo Mục Tiêu Mới</h2>
@@ -415,7 +434,7 @@ export default function Savings() {
                 <input
                   type="number"
                   required
-                  placeholder="30000000"
+                  placeholder="32000000"
                   value={targetAmount}
                   onChange={(e) => setTargetAmount(e.target.value)}
                   className="w-full bg-[#141721] border border-[#252836] focus:border-blue-500 rounded-xl p-3.5 text-white focus:outline-none"
@@ -438,21 +457,32 @@ export default function Savings() {
                   <select
                     value={period}
                     onChange={(e) => setPeriod(e.target.value)}
-                    className="w-full bg-[#141721] border border-[#252836] focus:border-blue-500 rounded-xl p-3.5 text-white focus:outline-none"
+                    className="w-full bg-[#141721] border border-[#252836] focus:border-blue-500 rounded-xl p-3.5 text-white focus:outline-none cursor-pointer"
                   >
                     <option value="thang">Tháng</option>
                     <option value="nam">Năm</option>
                   </select>
                 </div>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-[#252836] text-gray-300 py-3 rounded-xl font-medium">Hủy</button>
-                <button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-xl font-semibold">Tạo mục tiêu</button>
+
+              {/* Box hiển thị gợi ý số tiền tiết kiệm hàng tháng */}
+              {calculatedMonthlySaving > 0 && (
+                <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3.5 flex items-center justify-between">
+                  <span className="text-xs text-gray-300 font-medium">Cần tiết kiệm dự kiến:</span>
+                  <span className="text-sm font-bold text-blue-400">
+                    {calculatedMonthlySaving.toLocaleString('vi-VN')} đ / tháng
+                  </span>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-[#252836] hover:bg-[#31384D] text-gray-300 py-3 rounded-xl font-medium transition cursor-pointer">Hủy</button>
+                <button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3 rounded-xl font-semibold transition cursor-pointer">Tạo mục tiêu</button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

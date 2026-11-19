@@ -1,17 +1,14 @@
 import { 
-  Home, PieChart, Wallet, User, Settings, Activity, PiggyBank,
+  Home, BarChart2, Wallet, User, Settings, Activity, PiggyBank, Receipt, 
   Zap, ShoppingCart, Briefcase, Film 
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
   { id: 'home', label: 'Trang chủ', icon: Home, active: true },
-  { id: 'analytics', label: 'Thống kê', icon: PieChart, active: false },
-  { id: 'wallets', label: 'Ví của tôi', icon: Wallet, active: false },
-  { id: 'transactions', label: 'Giao dịch', icon: Zap, active: false },
-  { id: 'profile', label: 'Cá nhân', icon: User, active: false },
+  { id: 'transactions', label: 'Giao dịch', icon: Receipt, active: false },
+  { id: 'budget', label: 'Ngân sách', icon: Activity, active: false },
   { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank, active: false },
-  { id: 'activity', label: 'Hoạt động', icon: Activity, active: false },
-  { id: 'settings', label: 'Cài đặt', icon: Settings, active: false },
+  { id: 'analytics', label: 'Thống kê', icon: BarChart2, active: false },
 ];
 
 export const TRANSACTIONS = [
