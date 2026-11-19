@@ -89,7 +89,6 @@ def update_transaction_atomic(
 
 
 def soft_delete_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, revert_delta: int):
-<<<<<<< refs/remotes/origin/minh
     try:
         # 1. Hoàn lại số dư vào ví
         wallet.balance += revert_delta
@@ -119,21 +118,6 @@ def restore_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, ap
         db.rollback()
         raise e
     
-=======
-    wallet.balance += revert_delta
-    txn.delete_at = func.now()
-    db.flush()
-    return True
-
-
-def restore_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, apply_delta: int) -> Transaction:
-    wallet.balance += apply_delta
-    txn.delete_at = None
-    db.flush()
-    return txn
-
-
->>>>>>> local
 def get_filtered_transactions(
     db: Session,
     user_id: int,
@@ -176,12 +160,8 @@ def get_filtered_transactions(
 
 
 def get_all_for_export(db: Session, user_id: int, from_date: Optional[date] = None, to_date: Optional[date] = None):
-<<<<<<< refs/remotes/origin/minh
     """Lấy toàn bộ giao dịch (không phân trang) để xuất ra file CSV"""
     query = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
-=======
-    query = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.delete_at.is_(None))
->>>>>>> local
     if from_date:
         query = query.filter(func.date(Transaction.txn_date) >= from_date)
     if to_date:
