@@ -29,7 +29,7 @@ const MainLayout = () => {
       <Header user={user} />
       
       <div className="flex flex-1 overflow-hidden relative">
-        <Sidebar />
+        
 
         {/* Khu vực nội dung thay đổi linh hoạt tùy theo trang (Dashboard, Transactions,...) */}
         <div className="flex flex-1 overflow-y-auto custom-scrollbar flex-col bg-[#0F111A]">

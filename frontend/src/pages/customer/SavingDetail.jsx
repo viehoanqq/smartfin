@@ -1,72 +1,54 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getSavingDetail, depositToSaving } from '../../services/savingsAPI';
-import { 
-  ArrowLeft, PiggyBank, Clock, 
+import axios from 'axios';
+import {
+  ArrowLeft, PiggyBank,
   Wallet, History, PlusCircle, RefreshCw, LogOut, X, CheckCircle2, AlertCircle, ArrowUpRight
 } from 'lucide-react';
+
+const API_BASE = 'http://localhost:8000/api/v1';
 
 export default function SavingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [goal, setGoal] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showExtendModal, setShowExtendModal] = useState(false);
 
-  // Mock số dư Ví chính của người dùng để test UI
-  const [walletBalance, setWalletBalance] = useState(15500000); // 15.500.000đ
-
-  // Form states
+  const [walletBalance, setWalletBalance] = useState(0);
   const [depositAmount, setDepositAmount] = useState('');
   const [extendValue, setExtendValue] = useState(3);
 
-  // Database giả lập
-  const mockDatabase = {
-    1: {
-      id: 1,
-      name: "Mua iPhone 18 Pro Max",
-      target_amount: 35000000,
-      current_amount: 24500000,
-      duration_value: 1,
-      period: "thang",
-      status: "active",
-      created_at: "2026-09-10T08:30:00Z",
-      contributions: [
-        { id: 101, amount: 14500000, contributed_at: "2026-09-11T09:00:00Z" },
-        { id: 102, amount: 10000000, contributed_at: "2026-09-20T10:15:00Z" }
-      ]
-    },
-    2: {
-      id: 2,
-      name: "Du lịch Nhật Bản",
-      target_amount: 50000000,
-      current_amount: 50000000,
-      duration_value: 1,
-      period: "nam",
-      status: "completed",
-      created_at: "2026-01-10T10:15:00Z",
-      contributions: [
-        { id: 201, amount: 20000000, contributed_at: "2026-02-01T08:00:00Z" },
-        { id: 202, amount: 30000000, contributed_at: "2026-05-15T14:30:00Z" }
-      ]
-    },
-    3: {
-      id: 3,
-      name: "Mua xe máy mới",
-      target_amount: 45000000,
-      current_amount: 12000000,
-      duration_value: 12,
-      period: "thang",
-      status: "active",
-      created_at: "2026-09-01T14:20:00Z",
-      contributions: [
-        { id: 301, amount: 5000000, contributed_at: "2026-09-02T11:00:00Z" },
-        { id: 302, amount: 7000000, contributed_at: "2026-10-01T16:45:00Z" }
-      ]
+  const fetchDetail = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const [goalRes, walletRes] = await Promise.all([
+        axios.get(`${API_BASE}/savings/${id}`, { headers }),
+        axios.get(`${API_BASE}/wallets/me`, { headers }).catch(() => null),
+      ]);
+
+      if (goalRes?.data) {
+        setGoal(goalRes.data);
+      }
+      if (walletRes?.data?.balance != null) {
+        setWalletBalance(Number(walletRes.data.balance));
+      }
+    } catch (error) {
+      console.error('Lỗi tải chi tiết mục tiêu:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDetail();
+  }, [id]);
 
   const getDueDate = (createdAtStr, durationValue, period) => {
     if (!createdAtStr) return null;
@@ -79,75 +61,92 @@ export default function SavingDetail() {
     return date;
   };
 
-  const fetchDetail = async () => {
-    try {
-      setLoading(true);
-      const data = await getSavingDetail(id);
-      if (data) {
-        setGoal(data);
-      } else {
-        setGoal(mockDatabase[id] || mockDatabase[1]);
-      }
-    } catch (error) {
-      setGoal(mockDatabase[id] || mockDatabase[1]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDetail();
-  }, [id]);
-
-  // Nộp tiền
+  // Nộp tiền vào hũ (gọi đúng endpoint /savings/${id}/deposit)
   const handleDeposit = async (e) => {
     e.preventDefault();
     const amount = Number(depositAmount);
-    
+    if (!amount || amount <= 0) return;
+
     if (amount > walletBalance) {
-      alert("Số dư ví không đủ để nộp!");
+      alert('Số dư ví không đủ để nộp!');
       return;
     }
 
     try {
-      await depositToSaving(id, { amount });
+      setSubmitting(true);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      await axios.post(
+        `${API_BASE}/savings/${id}/deposit`,
+        { amount },
+        { headers }
+      );
+
       setShowDepositModal(false);
       setDepositAmount('');
-      fetchDetail();
+      await fetchDetail();
     } catch (error) {
-      // Cập nhật Mock Data & Trừ số dư ví
-      setWalletBalance(prev => prev - amount);
-      setGoal(prev => ({
-        ...prev,
-        current_amount: prev.current_amount + amount,
-        contributions: [
-          { id: Date.now(), amount, contributed_at: new Date().toISOString() },
-          ...prev.contributions
-        ]
-      }));
-      setShowDepositModal(false);
-      setDepositAmount('');
+      console.error('Lỗi nộp tiền:', error);
+      alert(error?.response?.data?.detail || 'Nộp tiền vào hũ thất bại!');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Gia hạn
-  const handleExtendGoal = (e) => {
+  // Gia hạn mục tiêu
+  const handleExtendGoal = async (e) => {
     e.preventDefault();
-    setGoal(prev => ({
-      ...prev,
-      duration_value: Number(prev.duration_value) + Number(extendValue)
-    }));
-    setShowExtendModal(false);
-    alert(`Đã gia hạn thành công thêm ${extendValue} ${goal.period === 'thang' ? 'tháng' : 'năm'}!`);
+    const addedDuration = Number(extendValue);
+    if (!addedDuration || addedDuration <= 0) {
+      alert('Vui lòng nhập thời gian gia hạn lớn hơn 0!');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const nextDuration = Number(goal.duration_value || 0) + addedDuration;
+      await axios.put(
+        `${API_BASE}/savings/${id}`,
+        { duration_value: nextDuration },
+        { headers }
+      );
+
+      setShowExtendModal(false);
+      setExtendValue(3);
+      alert(`Đã gia hạn thành công thêm ${addedDuration} ${goal.period === 'thang' ? 'tháng' : 'năm'}!`);
+      await fetchDetail();
+    } catch (error) {
+      console.error('Lỗi gia hạn:', error);
+      alert(error?.response?.data?.detail || 'Gia hạn mục tiêu thất bại!');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Dừng & Rút tiền về ví
-  const handleStopAndWithdraw = () => {
-    const confirmMsg = `Bạn có chắc muốn dừng mục tiêu "${goal.name}" không?\n\nSố tiền ${goal.current_amount.toLocaleString('vi-VN')} đ đã tích lũy sẽ được chuyển trả về Ví chính của bạn.`;
-    if (window.confirm(confirmMsg)) {
-      setWalletBalance(prev => prev + goal.current_amount);
-      alert(`Đã rút ${goal.current_amount.toLocaleString('vi-VN')} đ về ví chính thành công!`);
-      navigate('/savings');
+  // Dừng & Rút tiền về ví -> current_amount về 0, status = 'cancelled', cộng ví & tạo giao dịch type = 'income'
+  const handleStopAndWithdraw = async () => {
+    const currentAmt = Number(goal.current_amount || 0);
+    const confirmMsg = `Bạn có chắc muốn hủy mục tiêu "${goal.name}" không?\n\nSố tiền ${currentAmt.toLocaleString('vi-VN')} đ đã tích lũy sẽ được chuyển về Ví chính (ghi nhận giao dịch Thu nhập) và mục tiêu chuyển sang trạng thái Đã hủy.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      await axios.post(`${API_BASE}/savings/${id}/withdraw`, {}, { headers });
+
+      alert(`Đã rút ${currentAmt.toLocaleString('vi-VN')} đ về ví chính và hủy mục tiêu!`);
+      await fetchDetail();
+    } catch (error) {
+      console.error('Lỗi rút tiền và hủy mục tiêu:', error);
+      alert(error?.response?.data?.detail || 'Không thể rút tiền và hủy mục tiêu lúc này.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -159,16 +158,30 @@ export default function SavingDetail() {
     );
   }
 
-  if (!goal) return null;
+  if (!goal) {
+    return (
+      <div className="text-center py-20 text-gray-400">
+        Không tìm thấy thông tin mục tiêu tiết kiệm.
+      </div>
+    );
+  }
 
   const now = new Date();
-  const current = goal.current_amount || 0;
+  const current = Number(goal.current_amount || 0);
   const percent = Math.min(100, Math.round((current / goal.target_amount) * 100));
   const dueDate = getDueDate(goal.created_at, goal.duration_value, goal.period);
-  const isCompleted = goal.status === 'completed' || percent >= 100;
-  const isExpired = !isCompleted && goal.status !== 'failed' && dueDate && dueDate < now;
-
+  const isCancelled = goal.status === 'cancelled';
+  const isCompleted = !isCancelled && (goal.status === 'completed' || percent >= 100);
+  const isExpired = !isCancelled && !isCompleted && dueDate && dueDate < now;
   const isOverBalance = Number(depositAmount) > walletBalance;
+
+  const statusBadge = isCancelled
+    ? { label: 'Đã hủy', cls: 'bg-gray-500/10 border-gray-500/30 text-gray-400' }
+    : isCompleted
+      ? { label: 'Đã hoàn thành', cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' }
+      : isExpired
+        ? { label: 'Quá hạn', cls: 'bg-rose-500/10 border-rose-500/30 text-rose-400' }
+        : { label: 'Đang tích lũy', cls: 'bg-blue-500/10 border-blue-500/30 text-blue-400' };
 
   return (
     <div className="w-full min-h-screen text-white space-y-6">
@@ -176,7 +189,7 @@ export default function SavingDetail() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/savings')}
-          className="p-2.5 bg-[#1e2330] hover:bg-[#252836] border border-[#252836] rounded-xl text-gray-300 hover:text-white transition"
+          className="p-2.5 bg-[#181B26] hover:bg-[#252A3A] border border-[#2E3448] rounded-xl text-gray-300 hover:text-white transition cursor-pointer"
         >
           <ArrowLeft size={20} />
         </button>
@@ -188,14 +201,10 @@ export default function SavingDetail() {
 
       {/* Main Info Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-[#1e2330] p-6 rounded-2xl border border-[#252836] space-y-6 shadow-xl">
+        <div className="lg:col-span-2 bg-[#181B26] p-6 rounded-2xl border border-[#2E3448] space-y-6 shadow-lg">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-3 border rounded-2xl ${
-                isCompleted ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                isExpired ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
-                'bg-blue-500/10 border-blue-500/20 text-blue-400'
-              }`}>
+              <div className={`p-3 border rounded-2xl ${statusBadge.cls}`}>
                 <PiggyBank size={28} />
               </div>
               <div>
@@ -204,26 +213,21 @@ export default function SavingDetail() {
               </div>
             </div>
 
-            <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${
-              isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-              isExpired ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
-              'bg-blue-500/10 border-blue-500/30 text-blue-400'
-            }`}>
-              {isCompleted ? 'Đã hoàn thành' : isExpired ? 'Quá hạn' : 'Đang tích lũy'}
+            <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${statusBadge.cls}`}>
+              {statusBadge.label}
             </span>
           </div>
 
           {/* Progress Bar */}
-          <div className="space-y-2 bg-[#141721] p-4 rounded-xl border border-[#252836]">
+          <div className="space-y-2 bg-[#0F111A] p-4 rounded-xl border border-[#2E3448]">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Tỉ lệ hoàn thành</span>
-              <span className={`font-bold ${
-                isCompleted ? 'text-emerald-400' : isExpired ? 'text-rose-400' : 'text-blue-400'
-              }`}>{percent}%</span>
+              <span className="font-bold text-blue-400">{percent}%</span>
             </div>
-            <div className="w-full bg-[#1e2330] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#252836]">
+            <div className="w-full bg-[#181B26] h-3.5 rounded-full overflow-hidden p-0.5 border border-[#2E3448]">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
+                  isCancelled ? 'bg-gray-600' :
                   isCompleted ? 'bg-gradient-to-r from-emerald-500 to-green-400' :
                   isExpired ? 'bg-gradient-to-r from-rose-600 to-red-500' :
                   'bg-gradient-to-r from-blue-600 to-indigo-500'
@@ -235,15 +239,15 @@ export default function SavingDetail() {
 
           {/* Money Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div className="bg-[#141721] p-4 rounded-xl border border-[#252836]">
+            <div className="bg-[#0F111A] p-4 rounded-xl border border-[#2E3448]">
               <p className="text-xs text-gray-400 mb-1">Đã tích lũy</p>
               <p className="text-lg font-extrabold text-emerald-400">{current.toLocaleString('vi-VN')} đ</p>
             </div>
-            <div className="bg-[#141721] p-4 rounded-xl border border-[#252836]">
+            <div className="bg-[#0F111A] p-4 rounded-xl border border-[#2E3448]">
               <p className="text-xs text-gray-400 mb-1">Mục tiêu</p>
               <p className="text-lg font-extrabold text-white">{goal.target_amount.toLocaleString('vi-VN')} đ</p>
             </div>
-            <div className="bg-[#141721] p-4 rounded-xl border border-[#252836] col-span-2 sm:col-span-1">
+            <div className="bg-[#0F111A] p-4 rounded-xl border border-[#2E3448] col-span-2 sm:col-span-1">
               <p className="text-xs text-gray-400 mb-1">Còn thiếu</p>
               <p className="text-lg font-extrabold text-rose-400">
                 {Math.max(0, goal.target_amount - current).toLocaleString('vi-VN')} đ
@@ -252,17 +256,26 @@ export default function SavingDetail() {
           </div>
 
           {/* Action Buttons */}
-          {isExpired ? (
+          {isCancelled ? (
+            <button
+              disabled
+              className="w-full py-3.5 bg-[#0F111A] text-gray-500 font-semibold rounded-xl flex items-center justify-center gap-2 border border-[#2E3448] cursor-not-allowed"
+            >
+              <LogOut size={18} /> Mục tiêu đã hủy
+            </button>
+          ) : isExpired ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
+                disabled={submitting}
                 onClick={() => setShowExtendModal(true)}
-                className="py-3.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-rose-500/20"
+                className="py-3.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-rose-500/20 cursor-pointer"
               >
                 <RefreshCw size={18} /> Gia hạn mục tiêu
               </button>
               <button
+                disabled={submitting}
                 onClick={handleStopAndWithdraw}
-                className="py-3.5 bg-[#252836] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 font-semibold rounded-xl flex items-center justify-center gap-2 transition"
+                className="py-3.5 bg-[#252A3A] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 font-semibold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <LogOut size={18} /> Dừng & Rút tiền về ví
               </button>
@@ -270,21 +283,23 @@ export default function SavingDetail() {
           ) : isCompleted ? (
             <button
               disabled
-              className="w-full py-3.5 bg-gray-800/50 text-gray-500 font-semibold rounded-xl flex items-center justify-center gap-2 border border-gray-800 cursor-not-allowed"
+              className="w-full py-3.5 bg-[#0F111A] text-gray-500 font-semibold rounded-xl flex items-center justify-center gap-2 border border-[#2E3448] cursor-not-allowed"
             >
               <CheckCircle2 size={18} /> Mục tiêu đã hoàn thành
             </button>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
+                disabled={submitting}
                 onClick={() => setShowDepositModal(true)}
-                className="sm:col-span-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-blue-500/20"
+                className="sm:col-span-2 py-3.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-blue-500/20 cursor-pointer"
               >
                 <PlusCircle size={18} /> Nạp thêm tiền
               </button>
               <button
+                disabled={submitting}
                 onClick={handleStopAndWithdraw}
-                className="py-3.5 bg-[#252836] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 font-semibold rounded-xl flex items-center justify-center gap-2 transition"
+                className="py-3.5 bg-[#252A3A] hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 font-semibold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
               >
                 <LogOut size={18} /> Dừng mục tiêu
               </button>
@@ -293,9 +308,9 @@ export default function SavingDetail() {
         </div>
 
         {/* Right Column: Lịch Sử */}
-        <div className="bg-[#1e2330] p-6 rounded-2xl border border-[#252836] flex flex-col justify-between shadow-xl">
+        <div className="bg-[#181B26] p-6 rounded-2xl border border-[#2E3448] flex flex-col justify-between shadow-lg">
           <div>
-            <div className="flex items-center gap-2 pb-4 mb-4 border-b border-[#252836]">
+            <div className="flex items-center gap-2 pb-4 mb-4 border-b border-[#2E3448]">
               <History className="text-blue-400" size={20} />
               <h3 className="font-bold text-lg">Lịch Sử Nạp Tiền</h3>
             </div>
@@ -307,7 +322,7 @@ export default function SavingDetail() {
                 {goal.contributions.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between items-center p-3.5 bg-[#141721] rounded-xl border border-[#252836]/80 hover:border-blue-500/30 transition"
+                    className="flex justify-between items-center p-3.5 bg-[#0F111A] rounded-xl border border-[#2E3448] hover:border-blue-500/30 transition"
                   >
                     <div>
                       <p className="font-semibold text-emerald-400 text-sm">
@@ -328,13 +343,13 @@ export default function SavingDetail() {
         </div>
       </div>
 
-      {/* MODAL NỘP TIỀN ĐƯỢC THIẾT KẾ LẠI VỚI THÔNG TIN VÍ BẢO MẬT & ĐẸP MẮT */}
+      {/* MODAL NỘP TIỀN */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-[#1e2330] p-6 sm:p-7 rounded-2xl w-full max-w-md border border-[#2d3345] shadow-2xl relative">
+        <div className="fixed inset-0 bg-[#090A0F]/85 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B26] p-6 sm:p-7 rounded-2xl w-full max-w-md border border-[#2E3448] shadow-2xl relative">
             <button
               onClick={() => setShowDepositModal(false)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-white transition p-1 hover:bg-[#252836] rounded-lg"
+              className="absolute top-5 right-5 text-gray-400 hover:text-white transition p-1 bg-[#252A3A] hover:bg-[#31384D] rounded-lg cursor-pointer"
             >
               <X size={20} />
             </button>
@@ -349,8 +364,7 @@ export default function SavingDetail() {
               </div>
             </div>
 
-            {/* Thẻ nguồn thanh toán (Ví chính) */}
-            <div className="bg-[#141721] p-4 rounded-xl border border-[#2d3345] mb-5 space-y-2">
+            <div className="bg-[#0F111A] p-4 rounded-xl border border-[#2E3448] mb-5 space-y-2">
               <div className="flex justify-between items-center text-xs text-gray-400">
                 <span className="font-medium">Nguồn thanh toán</span>
                 <span className="text-emerald-400 font-semibold flex items-center gap-1">Ví chính <ArrowUpRight size={12} /></span>
@@ -376,8 +390,8 @@ export default function SavingDetail() {
                     placeholder="VD: 500000"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
-                    className={`w-full bg-[#141721] border rounded-xl p-3.5 text-white focus:outline-none text-base font-bold transition ${
-                      isOverBalance ? 'border-rose-500/80 focus:border-rose-500' : 'border-[#2d3345] focus:border-blue-500'
+                    className={`w-full bg-[#0F111A] border rounded-xl p-3.5 text-white focus:outline-none text-base font-bold transition ${
+                      isOverBalance ? 'border-rose-500/80 focus:border-rose-500' : 'border-[#2E3448] focus:border-blue-500'
                     }`}
                   />
                   {depositAmount && (
@@ -385,7 +399,6 @@ export default function SavingDetail() {
                   )}
                 </div>
 
-                {/* Cảnh báo nếu nộp vượt quá số dư */}
                 {isOverBalance && (
                   <p className="text-rose-400 text-xs mt-1.5 flex items-center gap-1 font-medium">
                     <AlertCircle size={13} /> Số dư ví không đủ để nộp số tiền này!
@@ -393,7 +406,6 @@ export default function SavingDetail() {
                 )}
               </div>
 
-              {/* Các nút chọn nhanh số tiền */}
               <div>
                 <p className="text-[11px] text-gray-400 font-medium mb-2">Chọn nhanh số tiền:</p>
                 <div className="grid grid-cols-4 gap-2 text-xs">
@@ -402,7 +414,7 @@ export default function SavingDetail() {
                       key={amt}
                       type="button"
                       onClick={() => setDepositAmount(amt.toString())}
-                      className="py-2 bg-[#141721] hover:bg-[#252836] border border-[#2d3345] hover:border-blue-500/50 text-gray-300 hover:text-white rounded-lg transition font-medium text-[11px]"
+                      className="py-2 bg-[#0F111A] hover:bg-[#252A3A] border border-[#2E3448] hover:border-blue-500/50 text-gray-300 hover:text-white rounded-lg transition font-medium text-[11px] cursor-pointer"
                     >
                       +{(amt / 1000000) >= 1 ? `${amt / 1000000}Tr` : `${amt / 1000}K`}
                     </button>
@@ -414,16 +426,16 @@ export default function SavingDetail() {
                 <button
                   type="button"
                   onClick={() => setShowDepositModal(false)}
-                  className="flex-1 bg-[#252836] hover:bg-[#2d3345] text-gray-300 py-3 rounded-xl font-medium text-sm transition"
+                  className="flex-1 bg-[#252A3A] hover:bg-[#31384D] text-gray-300 py-3 rounded-xl font-medium text-sm transition cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  disabled={isOverBalance || !depositAmount}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-gray-800 disabled:to-gray-800 disabled:text-gray-500 text-white py-3 rounded-xl font-semibold text-sm transition shadow-lg shadow-blue-500/20 active:scale-[0.98]"
+                  disabled={submitting || isOverBalance || !depositAmount}
+                  className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-[#181B26] disabled:text-gray-500 text-white py-3 rounded-xl font-semibold text-sm transition shadow-lg shadow-blue-500/20 cursor-pointer"
                 >
-                  Xác nhận nộp
+                  {submitting ? 'Đang xử lý...' : 'Xác nhận nộp'}
                 </button>
               </div>
             </form>
@@ -433,14 +445,18 @@ export default function SavingDetail() {
 
       {/* Modal Gia Hạn */}
       {showExtendModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1e2330] p-6 sm:p-7 rounded-2xl w-full max-w-md border border-[#2d3345] shadow-2xl relative">
-            <button onClick={() => setShowExtendModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white"><X size={20} /></button>
+        <div className="fixed inset-0 bg-[#090A0F]/85 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#181B26] p-6 sm:p-7 rounded-2xl w-full max-w-md border border-[#2E3448] shadow-2xl relative">
+            <button onClick={() => setShowExtendModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white cursor-pointer">
+              <X size={20} />
+            </button>
             <div className="flex items-center gap-3 mb-2 text-rose-400">
               <RefreshCw size={24} />
               <h2 className="text-xl font-bold text-white">Gia Hạn Mục Tiêu</h2>
             </div>
-            <p className="text-gray-400 text-sm mb-6">Mục tiêu: <span className="text-white font-semibold">{goal.name}</span></p>
+            <p className="text-gray-400 text-sm mb-6">
+              Mục tiêu: <span className="text-white font-semibold">{goal.name}</span>
+            </p>
 
             <form onSubmit={handleExtendGoal} className="space-y-4">
               <div>
@@ -453,13 +469,25 @@ export default function SavingDetail() {
                   min="1"
                   value={extendValue}
                   onChange={(e) => setExtendValue(e.target.value)}
-                  className="w-full bg-[#141721] border border-[#2d3345] focus:border-rose-500 rounded-xl p-3.5 text-white focus:outline-none transition"
+                  className="w-full bg-[#0F111A] border border-[#2E3448] focus:border-rose-500 rounded-xl p-3.5 text-white focus:outline-none transition"
                 />
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowExtendModal(false)} className="flex-1 bg-[#252836] text-gray-300 py-3 rounded-xl font-medium">Hủy</button>
-                <button type="submit" className="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white py-3 rounded-xl font-semibold">Xác nhận gia hạn</button>
+                <button
+                  type="button"
+                  onClick={() => setShowExtendModal(false)}
+                  className="flex-1 bg-[#252A3A] text-gray-300 py-3 rounded-xl font-medium cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white py-3 rounded-xl font-semibold cursor-pointer"
+                >
+                  {submitting ? 'Đang lưu...' : 'Xác nhận gia hạn'}
+                </button>
               </div>
             </form>
           </div>

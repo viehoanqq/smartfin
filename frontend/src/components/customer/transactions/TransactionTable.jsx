@@ -1,8 +1,55 @@
 import React from 'react';
-import { Eye, Edit2, Trash2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
+const TYPE_CONFIG = {
+  income: {
+    label: 'Thu nhập',
+    badgeClass: 'bg-emerald-500/10 border border-emerald-500/25 text-emerald-400',
+    amountClass: 'text-[#4ADE80]',
+    sign: '+',
+  },
+  saving: {
+    label: 'Tiết kiệm',
+    badgeClass: 'bg-blue-500/10 border border-blue-500/25 text-blue-400',
+    amountClass: 'text-[#60A5FA]',
+    sign: '-',
+  },
+  expense: {
+    label: 'Chi tiêu',
+    badgeClass: 'bg-rose-500/10 border border-rose-500/25 text-rose-400',
+    amountClass: 'text-[#F87171]',
+    sign: '-',
+  },
+};
 
-const TransactionTable = ({ transactions, currency, pagination, onPageChange, onView, onEdit, onDelete }) => {
+const getTxnDateSource = (txn) => txn?.created_at || txn?.create_at || txn?.txn_date;
+
+const parseTxnDate = (rawDate) => {
+  if (!rawDate) return null;
+  if (rawDate instanceof Date) return Number.isNaN(rawDate.getTime()) ? null : rawDate;
+
+  let str = String(rawDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(str)) {
+    str = `${str}Z`;
+  }
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const formatTxnDateTime = (txn) => {
+  const d = parseTxnDate(getTxnDateSource(txn));
+  if (!d) return { dateStr: '--', timeStr: '' };
+  return {
+    dateStr: d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
+    timeStr: d.toLocaleTimeString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  };
+};
+
+const TransactionTable = ({ transactions, currency, pagination, onPageChange, onView }) => {
   return (
     <div className="bg-[#181B26] border border-[#2E3448] rounded-2xl shadow-lg overflow-hidden mb-6">
       <div className="overflow-x-auto">
@@ -27,50 +74,51 @@ const TransactionTable = ({ transactions, currency, pagination, onPageChange, on
             ) : (
               transactions.map((txn) => {
                 const isNLP = txn.source?.toLowerCase() === 'nlp';
+                const cfg = TYPE_CONFIG[txn.type] || TYPE_CONFIG.expense;
+                const { dateStr, timeStr } = formatTxnDateTime(txn);
+
                 return (
                   <tr key={txn.id} className="hover:bg-[#202432] transition-colors">
                     <td className="py-4 px-6 text-gray-100 whitespace-nowrap font-medium">
-                      {new Date(txn.txn_date).toLocaleDateString('vi-VN')}{' '}
-                      <span className="text-gray-400 text-xs ml-1">
-                        {new Date(txn.txn_date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      {dateStr}{' '}
+                      {timeStr && (
+                        <span className="text-gray-400 text-xs ml-1">{timeStr}</span>
+                      )}
                     </td>
-                    <td 
+                    <td
                       onClick={() => onView(txn)}
                       className="py-4 px-6 font-semibold text-white hover:text-blue-400 cursor-pointer transition-colors"
                     >
                       {txn.note || 'Không có ghi chú'}
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold ${
-                        txn.type === 'income' ? 'bg-[#15803D] text-white' : 'bg-[#B91C1C] text-white'
-                      }`}>
-                        {txn.type === 'income' ? 'Thu nhập' : 'Khoản chi'}
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${cfg.badgeClass}`}>
+                        {cfg.label}
                       </span>
                     </td>
-                    <td className={`py-4 px-6 text-right font-bold whitespace-nowrap ${
-                      txn.type === 'income' ? 'text-[#4ADE80]' : 'text-[#F87171]'
-                    }`}>
-                      {txn.type === 'income' ? '+' : '-'}{Number(txn.amount).toLocaleString('vi-VN')} {currency || 'VND'}
+                    <td className={`py-4 px-6 text-right font-bold whitespace-nowrap ${cfg.amountClass}`}>
+                      {cfg.sign}{Number(txn.amount).toLocaleString('vi-VN')} {currency || 'VND'}
                     </td>
                     <td className="py-4 px-6 text-center whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-lg font-semibold ${
-                        isNLP ? 'bg-[#6D28D9] text-white' : 'bg-[#282E40] text-gray-100 border border-[#3A425A]'
-                      }`}>
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-semibold ${
+                          isNLP
+                            ? 'bg-purple-500/15 border border-purple-500/30 text-purple-300'
+                            : 'bg-[#282E40] text-gray-200 border border-[#3A425A]'
+                        }`}
+                      >
                         {isNLP && <Sparkles size={12} />}
                         {isNLP ? 'Tự động' : 'Thủ công'}
                       </span>
                     </td>
                     <td className="py-4 px-6 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => onView(txn)} className="p-2 bg-[#252A3A] hover:bg-[#2563EB] text-gray-200 hover:text-white rounded-lg cursor-pointer" title="Xem chi tiết">
+                        <button
+                          onClick={() => onView(txn)}
+                          className="p-2 bg-[#252A3A] hover:bg-[#2563EB] text-gray-200 hover:text-white rounded-lg cursor-pointer transition-colors"
+                          title="Xem chi tiết"
+                        >
                           <Eye size={16} />
-                        </button>
-                        <button onClick={() => onEdit(txn)} className="p-2 bg-[#252A3A] hover:bg-[#D97706] text-gray-200 hover:text-white rounded-lg cursor-pointer" title="Chỉnh sửa">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => onDelete(txn)} className="p-2 bg-[#252A3A] hover:bg-[#DC2626] text-gray-200 hover:text-white rounded-lg cursor-pointer" title="Xóa">
-                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
@@ -84,19 +132,21 @@ const TransactionTable = ({ transactions, currency, pagination, onPageChange, on
 
       {/* Phân trang */}
       <div className="py-4 px-6 border-t border-[#2E3448] flex items-center justify-between text-sm text-gray-200 bg-[#12151E]">
-        <span>Trang <strong className="text-white">{pagination.page}</strong> / {pagination.total_pages} (Tổng số: {pagination.total} giao dịch)</span>
+        <span>
+          Trang <strong className="text-white">{pagination.page}</strong> / {pagination.total_pages} (Tổng số: {pagination.total} giao dịch)
+        </span>
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={() => onPageChange(pagination.page - 1)}
             disabled={pagination.page <= 1}
-            className="p-2 bg-[#252A3A] hover:bg-[#31384D] disabled:opacity-40 text-white rounded-xl cursor-pointer"
+            className="p-2 bg-[#252A3A] hover:bg-[#31384D] disabled:opacity-40 text-white rounded-xl cursor-pointer transition-colors"
           >
             <ChevronLeft size={18} />
           </button>
-          <button 
+          <button
             onClick={() => onPageChange(pagination.page + 1)}
             disabled={pagination.page >= pagination.total_pages}
-            className="p-2 bg-[#252A3A] hover:bg-[#31384D] disabled:opacity-40 text-white rounded-xl cursor-pointer"
+            className="p-2 bg-[#252A3A] hover:bg-[#31384D] disabled:opacity-40 text-white rounded-xl cursor-pointer transition-colors"
           >
             <ChevronRight size={18} />
           </button>

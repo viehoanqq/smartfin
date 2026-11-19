@@ -14,6 +14,7 @@ import Transactions from './pages/customer/Transactions';
 import Savings from './pages/customer/Savings';
 import SavingDetail from './pages/customer/SavingDetail';
 import Wallets from './pages/customer/Wallets';
+import Budgets from './pages/customer/Budgets';
 
 
 
@@ -70,12 +71,14 @@ export default function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
+            <Route path="/home" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Settings />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/savings" element={<Savings />} />
             <Route path="/savings/:id" element={<SavingDetail />} />
             <Route path="/wallets" element={<Wallets />} /> 
+            <Route path="/budget" element={<Budgets />} /> 
           </Route>
           
 
