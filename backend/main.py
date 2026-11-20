@@ -4,6 +4,7 @@ from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.session import get_db
+from app.api.v1.routers import notification_api
 from app.api.v1.routers import (
     auth_api, 
     user_api, 
@@ -23,6 +24,7 @@ app = FastAPI(
 
 # Đăng ký các router API
 app.include_router(auth_api.router, prefix="/api/v1")
+app.include_router(notification_api.router, prefix="/api/v1")
 app.include_router(user_api.router, prefix="/api/v1")
 app.include_router(transaction_api.router, prefix="/api/v1")
 app.include_router(categories.router, prefix="/api/v1")

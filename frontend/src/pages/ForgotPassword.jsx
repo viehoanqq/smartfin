@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { authApi } from '../services/authApi';
+import { passwordError, PASSWORD_HINT, authError } from '../utils/password';
 import {
   TrendingUp,
   Eye,
@@ -77,6 +78,11 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [resendAt, setResendAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const redirectTimer = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const [error, setError] = useState('');
@@ -85,6 +91,13 @@ const ForgotPassword = () => {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => { clearInterval(timer); clearTimeout(redirectTimer.current); };
+  }, []);
+  const secondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const resendLeft = Math.max(0, Math.ceil((resendAt - now) / 1000));
+
   const handleRequestOTP = async (e) => {
     e.preventDefault();
     setError('');
@@ -92,13 +105,20 @@ const ForgotPassword = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/v1/auth/forgot-password', {
-        email,
-      });
-      setSuccess(response?.data?.message || 'Mã khôi phục đã được gửi!');
+      const response = await authApi.forgotPassword(email);
+      const requestedAt = Date.now();
+      setNow(requestedAt);
+      setExpiresAt(requestedAt + (response.expires_in ?? 300) * 1000);
+      setResendAt(requestedAt + (response.resend_after ?? 60) * 1000);
+      setResetCode('');
+      setSuccess(response.message);
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Có lỗi xảy ra, vui lòng thử lại.');
+      setError(authError(err, 'Có lỗi xảy ra, vui lòng thử lại.'));
+      if (err?.response?.status === 429) {
+        const wait = Number(err.response.headers?.['retry-after']) || 60;
+        setResendAt(Date.now() + wait * 1000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -106,22 +126,32 @@ const ForgotPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+    const validation = passwordError(newPassword);
+    if (validation || newPassword !== confirmPassword) {
+      setError(validation || 'Xác nhận mật khẩu không khớp.');
+      return;
+    }
     setError('');
     setSuccess('');
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/v1/auth/reset-password', {
+      const response = await authApi.resetPassword({
         email,
         reset_code: resetCode,
         new_password: newPassword,
+        confirm_password: confirmPassword,
       });
-      setSuccess(response?.data?.message || 'Đặt lại mật khẩu thành công!');
-      setTimeout(() => {
+      localStorage.removeItem('access_token');
+      setNewPassword('');
+      setConfirmPassword('');
+      setResetCode('');
+      setSuccess(response.message || 'Đặt lại mật khẩu thành công!');
+      redirectTimer.current = setTimeout(() => {
         navigate('/login');
       }, 1000);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Mã OTP không hợp lệ hoặc lỗi kết nối.');
+      setError(authError(err, 'Mã OTP không hợp lệ hoặc lỗi kết nối.'));
     } finally {
       setIsLoading(false);
     }
@@ -380,7 +410,7 @@ const ForgotPassword = () => {
 
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || resendLeft > 0}
                   className="w-full mt-2 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white text-sm font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.99] cursor-pointer"
                 >
                   {isLoading ? (
@@ -390,7 +420,7 @@ const ForgotPassword = () => {
                     </>
                   ) : (
                     <>
-                      <span>Gửi mã OTP</span>
+                      <span>{resendLeft > 0 ? `Gửi lại sau ${resendLeft}s` : 'Gửi mã OTP'}</span>
                       <ArrowRight size={17} />
                     </>
                   )}
@@ -426,12 +456,19 @@ const ForgotPassword = () => {
                   <input
                     id="reset-otp"
                     type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
                     placeholder="Nhập mã OTP"
                     required
                     value={resetCode}
-                    onChange={(e) => setResetCode(e.target.value)}
+                    onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full bg-[#0F111A] border border-[#2E3448] focus:border-blue-500 rounded-xl px-4 py-3.5 text-sm text-white placeholder-gray-500 outline-none transition-all"
                   />
+                  <p className="text-xs text-gray-400">{secondsLeft > 0 ? `Mã hết hạn sau ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : 'Mã đã hết hạn. Vui lòng yêu cầu mã mới.'}</p>
+                  <button type="button" disabled={isLoading || resendLeft > 0} onClick={handleRequestOTP}
+                    className="text-sm text-blue-400 disabled:opacity-50">{resendLeft > 0 ? `Gửi lại sau ${resendLeft}s` : 'Gửi lại mã OTP'}</button>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -459,9 +496,16 @@ const ForgotPassword = () => {
                   </div>
                 </div>
 
+                <p className="text-xs text-gray-400">{PASSWORD_HINT}</p>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="confirm-password" className="text-xs font-semibold uppercase tracking-wider text-gray-400">Xác nhận mật khẩu mới</label>
+                  <input id="confirm-password" type="password" autoComplete="new-password" required
+                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-[#0F111A] border border-[#2E3448] focus:border-blue-500 rounded-xl px-4 py-3.5 text-sm text-white outline-none" />
+                </div>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || secondsLeft === 0 || Boolean(success?.includes('thành công'))}
                   className="w-full mt-2 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white text-sm font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-600/25 transition-all active:scale-[0.99] cursor-pointer"
                 >
                   {isLoading ? (

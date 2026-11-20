@@ -4,6 +4,61 @@ SmartFin là dự án nền tảng cho ứng dụng quản lý tài chính cá n
 
 hello world
 
+## Thông báo và bảo mật mật khẩu
+
+- Đổi mật khẩu: `POST /api/v1/auth/change-password`, JWT Bearer, JSON gồm
+  `old_password`, `new_password`, `confirm_password`. Mật khẩu mới tối thiểu
+  8 ký tự, tối đa 72 byte UTF-8, có chữ hoa/thường, số, ký tự đặc biệt,
+  không có khoảng trắng và khác mật khẩu hiện tại. Validation backend là bắt buộc.
+- Mật khẩu và thông báo thành công được ghi trong cùng một transaction;
+  lỗi khi lưu thông báo cũng rollback mật khẩu. Không thay đổi schema.
+- API thông báo yêu cầu JWT và chỉ thao tác dữ liệu của người đăng nhập:
+  `GET /api/v1/notifications?page=1&page_size=10` (tối đa 100),
+  `GET /api/v1/notifications/unread-count`,
+  `PATCH /api/v1/notifications/{id}/read`,
+  `PATCH /api/v1/notifications/read-all`.
+  Chuông trên header người dùng/quản trị cập nhật mỗi 30 giây khi tab hiển thị.
+- **OTP Demo chỉ dành cho local/development**, mặc định tắt. Để bật, thêm vào
+  `backend/.env` rồi khởi động lại backend:
+
+  ```dotenv
+  APP_ENV=development
+  OTP_DEMO_MODE=true
+  ```
+
+  Vào trang quên mật khẩu, nhập email tài khoản đã tồn tại. Lấy mã từ terminal
+  chạy backend, dòng `[OTP DEMO - LOCAL ONLY] <email>: <6 chữ số>`, rồi nhập mã
+  và mật khẩu mới cùng xác nhận trên giao diện hiện có. Không gửi email thật,
+  không trả mã qua API. Response vẫn dùng thông điệp chung để không lộ tài khoản.
+  `APP_ENV=local` cũng được chấp nhận; môi trường khác sẽ từ chối khởi động nếu bật Demo.
+  Khi `OTP_DEMO_MODE=false`, hai API khôi phục vẫn trả HTTP 503.
+- Demo lưu HMAC trong RAM với khóa ngẫu nhiên riêng cho tiến trình, mã sinh bằng
+  `secrets`, hết hạn 300 giây, dùng một lần, thay mã cũ khi gửi lại; giới hạn 5 lần
+  nhập sai, chờ gửi lại 60 giây, tối đa 5 yêu cầu/email/giờ và 20 yêu cầu/client/giờ.
+  Kho RAM có khóa bảo vệ thao tác đồng thời. Chạy Demo bằng **một worker**;
+  khởi động lại/reload backend sẽ mất OTP và bộ đếm. Không dùng Demo trên production.
+  Chưa có Redis/SMTP adapter, không thêm hạ tầng hay migration.
+  OTP bị tiêu thụ trước khi ghi mật khẩu; nếu transaction thất bại, cần yêu cầu mã mới.
+- JWT hiện chưa có kho thu hồi phiên. Đổi/đặt lại mật khẩu **không thu hồi token đã cấp**;
+  không coi đăng xuất ở frontend là thu hồi token phía server. Cần duyệt thiết kế
+  thu hồi phiên trước khi hoàn thiện luồng khôi phục cho production.
+- Ngoài hai biến bật Demo trên, tiếp tục cấu hình
+  `DATABASE_URL`, `SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`.
+  Không cần cấu hình SMTP, Redis hoặc khóa HMAC cho Demo. Không chia sẻ giá trị bí mật.
+
+Kiểm thử auth/thông báo an toàn, từ `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_auth.py -q
+```
+
+File này giữ 8 tình huống auth gốc, sử dụng fixture độc lập và SQLite riêng trong RAM,
+override `get_db` và chặn kết nối/session của database cấu hình trong ứng dụng.
+Chỉ tạo bản sao ba bảng cần kiểm thử trên SQLite, không sửa model/metadata gốc,
+không chạy seed/migration và không dùng `TEST_DATABASE_URL` hay database hiện tại.
+Các test PostgreSQL khác không thuộc cơ chế cô lập này; không chạy toàn bộ suite
+với database có dữ liệu cần giữ.
+
 Xem [CONTRIBUTING.md](./CONTRIBUTING.md) để biết quy trình đóng góp và các bước kiểm tra trước khi tạo pull request.
 
 ## Công nghệ

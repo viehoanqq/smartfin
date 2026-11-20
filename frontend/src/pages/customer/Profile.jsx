@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, Save, Loader2, CheckCircle, AlertTriangle, Eye, EyeOff, KeyRound } from 'lucide-react';
-import axios from 'axios';
+import { authApi } from '../../services/authApi';
+import { passwordError, PASSWORD_HINT } from '../../utils/password';
 import { userAPI } from '../../services/userAPI';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import defaultAvatar from '../../assets/imgs/avt-default.png';
 
-const API_BASE = 'http://localhost:8000/api/v1';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -109,11 +109,11 @@ const Profile = () => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
 
-    if (passwordForm.new_password.length < 6) {
+    if (passwordError(passwordForm.new_password)) {
       setModalConfig({
         isOpen: true,
         title: 'Mật khẩu chưa hợp lệ',
-        message: 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+        message: passwordError(passwordForm.new_password),
         isDanger: true,
         icon: AlertTriangle,
         onConfirm: closeModal,
@@ -147,17 +147,8 @@ const Profile = () => {
 
     setIsChangingPassword(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      await axios.post(
-        `${API_BASE}/auth/change-password`,
-        {
-          old_password: passwordForm.old_password,
-          new_password: passwordForm.new_password,
-        },
-        { headers }
-      );
+      await authApi.changePassword(passwordForm);
+      window.dispatchEvent(new Event('notifications-changed'));
 
       setPasswordForm({
         old_password: '',
@@ -174,7 +165,6 @@ const Profile = () => {
         onConfirm: closeModal,
       });
     } catch (error) {
-      console.error('Lỗi khi đổi mật khẩu:', error);
       const detail = error?.response?.data?.detail;
       const errMsg =
         typeof detail === 'string'
@@ -383,7 +373,7 @@ const Profile = () => {
                         required
                         value={passwordForm.new_password}
                         onChange={handlePasswordChange}
-                        placeholder="Ít nhất 6 ký tự"
+                        placeholder="Ít nhất 8 ký tự"
                         className="w-full bg-[#0F111A] border border-[#2d3142] focus:border-blue-500 rounded-xl px-4 py-3.5 pr-12 text-white outline-none transition-all"
                       />
                       <button
@@ -397,6 +387,7 @@ const Profile = () => {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    <p className="text-xs text-gray-400">{PASSWORD_HINT}</p>
                     <label className="text-sm font-medium text-gray-300">Xác nhận mật khẩu mới *</label>
                     <div className="relative flex items-center">
                       <input

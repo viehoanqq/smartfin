@@ -29,11 +29,18 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     db.refresh(new_user)
     return new_user
 
-def change_user_password(db: Session, user: User, new_password: str) -> User:
+def change_user_password(db: Session, user: User, new_password: str, *, commit: bool = True) -> User:
     """Cập nhật mật khẩu mới cho user"""
     user.password_hash = get_password_hash(new_password)
-    db.commit()
-    db.refresh(user)
+    if commit:
+        try:
+            db.commit()
+            db.refresh(user)
+        except Exception:
+            db.rollback()
+            raise
+    else:
+        db.flush()
     return user
 
 def update_user_profile(db: Session, user: User, user_in: UserUpdate) -> User:
