@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
-  Search, Bell, User, HelpCircle, LogOut, ChevronDown, 
+  Search, User, HelpCircle, LogOut, ChevronDown,
   Home, BarChart2, Wallet, ArrowLeftRight, PiggyBank, Activity, Receipt, Layers
 } from 'lucide-react';
 import { NAV_ITEMS } from '../../mock/dashboardData';
 import defaultAvatar from '../../assets/imgs/avt-default.png';
 import ConfirmModal from '../common/ConfirmModal';
+import NotificationBell from '../common/NotificationBell';
 
 const iconMap = {
   home: Home,
@@ -75,10 +76,7 @@ const Header = ({ user }) => {
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
           </div>
 
-          <button className="relative w-10 h-10 rounded-full bg-[#181920] border border-[#2d3142] flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-            <Bell size={18} />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 border-2 border-[#181920]"></span>
-          </button>
+          <NotificationBell key={user?.id} />
 
           <div className="relative group cursor-pointer flex items-center gap-3 bg-[#181920]/50 hover:bg-[#252836] border border-transparent hover:border-[#2d3142] p-1.5 pr-3 rounded-full transition-all duration-300">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 p-[2px]">
