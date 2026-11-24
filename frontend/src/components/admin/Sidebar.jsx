@@ -1,37 +1,47 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom'; // 1. Import thêm useLocation
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
-import { NAV_ITEMS } from '../../mock/dashboardData';
-import ConfirmModal from '../common/ConfirmModal'; 
+import { ADMIN_NAV_ITEMS } from '../../mock/dashboardData';
+import ConfirmModal from '../common/ConfirmModal';
+import { useAuth } from '../../context/AuthContext';
 
 const Sidebar = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // 2. Lấy thông tin URL hiện tại
+  const location = useLocation();
+  const { logout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Hàm xử lý logic khi bấm nút Xác nhận Đăng xuất
   const executeLogout = () => {
-    localStorage.removeItem('access_token');
-    navigate('/login');
+    logout();
+    navigate('/login', { replace: true });
   };
 
   return (
     <>
-      <aside className="w-64 h-full py-8 px-6 flex flex-col justify-between border-r border-[#252836] hidden lg:flex bg-[#1a1c24] shrink-0">
+      <aside className="hidden lg:flex w-64 h-full py-8 px-6 flex-col justify-between border-r border-[#252836] bg-[#1a1c24] shrink-0">
         
-        <nav className="flex flex-col gap-2 overflow-y-auto custom-scrollbar">
-          {NAV_ITEMS.map((item) => {
+        {/* Logo đồng nhất với Header */}
+        <div className="mb-6 px-4">
+          <Link to="/admin/customers" className="flex items-center gap-2 group">
+            <span 
+              className="text-3xl font-black tracking-wider bg-gradient-to-r from-blue-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent group-hover:brightness-110 transition drop-shadow-sm font-sans" 
+              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              Smart<span className="text-emerald-400 font-extrabold">Fin</span>
+            </span>
+          </Link>
+        </div>
+
+        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
+          {ADMIN_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            
-            // 3. Kiểm tra xem item này có đang khớp với URL hiện tại không 
-            // (Giả lập item.id hoặc item.path tương ứng với đường dẫn, ví dụ: "/wallets" hoặc "wallets")
-            const currentPath = location.pathname;
-            const isActive = currentPath.includes(item.id); 
+            const targetPath = `/admin/${item.id}`;
+            const isActive = location.pathname.includes(item.id);
 
             return (
-              <a
+              <Link
                 key={item.id}
-                href={`/${item.id}`}
+                to={targetPath}
                 className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
                   isActive 
                     ? 'text-white font-semibold bg-[#252836]' 
@@ -39,8 +49,8 @@ const Sidebar = () => {
                 }`}
               >
                 <Icon size={20} className={isActive ? 'text-blue-500' : 'text-gray-500'} />
-                {item.label}
-              </a>
+                <span>{item.label}</span>
+              </Link>
             );
           })}
         </nav>
@@ -56,7 +66,6 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      {/* Tái sử dụng Confirm Modal */}
       <ConfirmModal 
         isOpen={showLogoutModal}
         title="Đăng xuất tài khoản?"

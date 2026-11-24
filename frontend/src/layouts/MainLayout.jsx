@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom'; // Hoặc dùng { children } tùy cấu trúc router của bạn
 import { MessageSquare } from 'lucide-react';
-import Sidebar from '../components/customer/Sidebar';
 import Header from '../components/customer/Header';
 import ChatbotPanel from '../components/customer/dashboard/ChatbotPanel';
 import { userAPI } from '../services/userAPI';

@@ -1,5 +1,6 @@
 import { 
-  Home, BarChart2, Wallet, User, Settings, Activity, PiggyBank, Receipt, 
+  Home, BarChart2, Activity, PiggyBank, Receipt, 
+  Users, ArrowLeftRight, PieChart, MessageSquareText, Sparkles,
   Zap, ShoppingCart, Briefcase, Film 
 } from 'lucide-react';
 
@@ -9,6 +10,14 @@ export const NAV_ITEMS = [
   { id: 'budget', label: 'Ngân sách', icon: Activity, active: false },
   { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank, active: false },
   { id: 'analytics', label: 'Thống kê', icon: BarChart2, active: false },
+];
+
+export const ADMIN_NAV_ITEMS = [
+  { id: 'customers', label: 'Khách hàng', icon: Users, active: true },
+  { id: 'transactions', label: 'Giao dịch', icon: ArrowLeftRight, active: false },
+  { id: 'categories', label: 'Danh mục', icon: PieChart, active: false },
+  { id: 'nlp', label: 'NLP', icon: MessageSquareText, active: false },
+  { id: 'ai', label: 'Trợ lý AI', icon: Sparkles, active: false },
 ];
 
 export const TRANSACTIONS = [

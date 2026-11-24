@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import NotificationBell from '../components/common/NotificationBell';
+import Sidebar from '../components/admin/Sidebar';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
@@ -12,20 +13,18 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
-        <h1 className="text-lg font-semibold">SmartFin Admin</h1>
-        <div className="flex items-center gap-4">
-          <NotificationBell key={user?.id} />
-          <span className="text-sm text-slate-600">{user?.full_name || user?.email}</span>
-          <button onClick={handleLogout} className="rounded-lg bg-red-500 px-3 py-1.5 text-sm text-white hover:bg-red-600">
-            Đăng xuất
-          </button>
-        </div>
-      </header>
-      <main className="p-6">
-        <Outlet />
-      </main>
+    <div className="flex h-screen overflow-hidden bg-[#141721] text-white">
+      {/* Sidebar bên trái */}
+      <Sidebar />
+
+      {/* Khu vực bên phải gồm Header và Main Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        
+
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };

@@ -204,7 +204,7 @@ const TransactionList = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-white">Giao dịch trong {currentMonthLabel}</h3>
+        <h3 className="text-lg font-semibold text-white">Giao dịch gần dây - {currentMonthLabel} </h3>
         <MoreHorizontal size={20} className="text-gray-500 cursor-pointer" />
       </div>
 

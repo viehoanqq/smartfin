@@ -6,7 +6,7 @@ from app.models.domain import Category
 DEFAULT_CATEGORIES = [
     "Ăn uống", "Di chuyển", "Nhà ở", "Hóa đơn", "Mua sắm", "Giải trí",
     "Sức khỏe", "Giáo dục", "Gia đình", "Quà tặng", "Trả nợ", "Khác",
-    "Lương", "Thưởng", "Thu nợ", "Thu nhập khác", "Tiết kiệm",
+    "Lương", "Thưởng", "Thu nợ", "Hoàn tiền", "Tiết kiệm",
 ]
 
 
