@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Depends
+from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.session import get_db
+from app.ai.classifier.service import get_classifier
+from app.ai.classifier.ner import warm_up_ner
 from app.api.v1.routers import notification_api
 from app.api.v1.routers import (
     auth_api, 
@@ -13,13 +16,21 @@ from app.api.v1.routers import (
     wallet_api, 
     saving_api, 
     admin_api,
-    budget  # <--- Đảm bảo bạn đã import router budget ở đây (hoặc app.routers.budget tùy cấu trúc thư mục của bạn)
+    budget, nlp_api, chat_api
 )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_classifier().warm_up()
+    warm_up_ner()
+    yield
+
 
 app = FastAPI(
     title="SmartFin API",
     description="Backend API cho ứng dụng quản lý tài chính SmartFin",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Đăng ký các router API
@@ -34,6 +45,10 @@ app.include_router(admin_api.router, prefix="/api/v1")
 
 # <--- Gắn router budget vào đây với prefix /api/v1 (vì trong file budget.py ta đã định nghĩa prefix="/api/v1/budget", FastAPI sẽ tự gộp thành /api/v1/budget)
 app.include_router(budget.router, prefix="/api/v1")
+app.include_router(nlp_api.router, prefix="/api/v1")
+app.include_router(chat_api.router, prefix="/api/v1")
+
+
 
 # Cấu hình CORS
 app.add_middleware(

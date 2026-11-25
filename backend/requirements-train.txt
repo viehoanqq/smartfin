@@ -1,0 +1,4 @@
+-r requirements.txt
+-r requirements-ai.txt
+datasets==5.2.0
+accelerate==1.16.0

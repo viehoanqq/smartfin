@@ -1,74 +1,99 @@
-import React from 'react';
-import { Send, X, Bot, Maximize2, Minimize2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, Maximize2, Minimize2, Plus, Send, Trash2, X } from 'lucide-react';
+import { chatAPI } from '../../../services/chatAPI';
 
-const ChatbotPanel = ({ isOpen, onClose, isFullscreen, setIsFullscreen, message, setMessage }) => {
-  return (
-    <aside 
-      // BÍ QUYẾT: Neo cứng ở right-0. Thay đổi top và width để tạo hiệu ứng bung tỏa từ góc phải
-      className={`fixed right-0 z-[100] bg-[#1a1c24] border-[#252836] shadow-[-20px_0_40px_rgba(0,0,0,0.5)] transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col overflow-hidden ${
-        isOpen 
-          ? isFullscreen 
-            ? 'w-full h-full top-0 translate-x-0 rounded-none border-l-0' // Bung full màn hình từ phải sang trái
-            : 'w-[380px] h-[calc(100vh-88px)] top-[88px] translate-x-0 rounded-tl-2xl border-l border-t' // Trạng thái bảng bên phải
-          : 'w-[380px] h-[calc(100vh-88px)] top-[88px] translate-x-full opacity-0' // Ẩn ra ngoài mép phải
-      }`}
-    >
-      <div className={`${isFullscreen ? 'w-full max-w-4xl mx-auto h-full border-x border-[#252836] shadow-2xl' : 'w-full h-full'} flex flex-col bg-[#1a1c24] transition-all duration-500`}>
-        {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b border-[#252836] shrink-0 bg-[#1a1c24]/90 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-              <Bot size={20} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-white text-base">Trợ lý SmartFin</h3>
-              <p className="text-xs text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Trực tuyến
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#252836] transition-all">
-              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-            </button>
-            <button onClick={() => { setIsFullscreen(false); onClose(); }} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-400 transition-all">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
+const welcome = { id: 'welcome', role: 'model', content: 'Xin chào! Bạn có thể hỏi về số dư, thu chi, ngân sách hoặc mục tiêu tiết kiệm của mình.' };
 
-        {/* Nội dung */}
-        <div className="flex-1 p-5 overflow-y-auto custom-scrollbar flex flex-col gap-5">
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 flex-shrink-0 flex items-center justify-center text-white mt-1">
-              <Bot size={14} />
-            </div>
-            <div className="bg-[#252836] text-sm text-gray-200 p-4 rounded-2xl rounded-tl-sm max-w-[85%] leading-relaxed shadow-sm border border-white/5">
-              Xin chào! Mình là AI của SmartFin. Bạn cần hỗ trợ gì?
-            </div>
-          </div>
-        </div>
+export default function ChatbotPanel({ isOpen, onClose, isFullscreen, setIsFullscreen }) {
+  const [sessions, setSessions] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
+  const [messages, setMessages] = useState([welcome]);
+  const [input, setInput] = useState('');
+  const [pending, setPending] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const endRef = useRef(null);
+  const restoredRef = useRef(false);
 
-        {/* Khung nhập */}
-        <div className="p-5 border-t border-[#252836] shrink-0">
-          <div className="relative flex items-center">
-            <input 
-              type="text" 
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Nhập yêu cầu của bạn..." 
-              className="w-full bg-[#181920] border border-[#2d3142] rounded-2xl py-3.5 pl-5 pr-12 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-all"
-              onKeyDown={(e) => e.key === 'Enter' && setMessage('')} 
-            />
-            <button onClick={() => setMessage('')} className="absolute right-3 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all">
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-};
+  useEffect(() => {
+    if (!isOpen || restoredRef.current) return;
+    restoredRef.current = true;
+    let active = true;
+    setLoading(true);
+    const restore = async () => {
+      try {
+        const saved = await chatAPI.sessions();
+        if (!active) return;
+        setSessions(saved);
+        if (saved.length) {
+          const history = await chatAPI.messages(saved[0].id);
+          if (!active) return;
+          setSessionId(saved[0].id);
+          setMessages(history.length ? history : [welcome]);
+        }
+      } catch {
+        if (active) setError('Không tải được lịch sử trò chuyện.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    restore();
+    return () => { active = false; restoredRef.current = false; };
+  }, [isOpen]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, pending]);
 
-export default ChatbotPanel;
+  const openSession = async (id) => {
+    setLoading(true); setError('');
+    try {
+      const data = await chatAPI.messages(id);
+      setSessionId(id);
+      setMessages(data.length ? data : [welcome]);
+    } catch { setError('Không tải được cuộc trò chuyện.'); }
+    finally { setLoading(false); }
+  };
+
+  const removeSession = async () => {
+    if (!sessionId || pending || !window.confirm('Xóa cuộc trò chuyện này?')) return;
+    try {
+      await chatAPI.remove(sessionId);
+      setSessions((old) => old.filter((s) => s.id !== sessionId));
+      setSessionId(null);
+      setMessages([welcome]);
+      setError('');
+    } catch { setError('Không xóa được cuộc trò chuyện.'); }
+  };
+
+  const send = async () => {
+    const question = input.trim();
+    if (!question || pending || loading) return;
+    setPending(true); setError(''); setInput('');
+    setMessages((old) => [...old, { id: `local-${Date.now()}`, role: 'user', content: question }]);
+    try {
+      const result = await chatAPI.send(question, sessionId);
+      setSessionId(result.session_id);
+      setMessages((old) => [...old, result.message]);
+      if (!sessionId) setSessions((old) => [{ id: result.session_id, title: question.slice(0, 80) }, ...old]);
+    } catch (err) {
+      setMessages((old) => old.slice(0, -1));
+      setInput(question);
+      setError(err.response?.data?.detail || 'Không gửi được tin nhắn. Vui lòng thử lại.');
+    } finally { setPending(false); }
+  };
+
+  return <aside aria-label="Trợ lý SmartFin" className={`fixed right-0 z-[100] flex flex-col bg-white text-slate-900 border-l border-slate-200 shadow-2xl transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'} ${isFullscreen ? 'inset-0 w-full' : 'top-0 h-full w-full sm:w-[420px]'}`}>
+    <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+      <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-600 text-white"><Bot size={20}/></span><div><h2 className="font-semibold">Trợ lý SmartFin</h2><p className="text-xs text-slate-500">Hỏi về tài chính của bạn</p></div></div>
+      <div className="flex gap-1"><button aria-label="Cuộc trò chuyện mới" title="Cuộc trò chuyện mới" disabled={pending || loading} onClick={() => { setSessionId(null); setMessages([welcome]); setError(''); }} className="rounded-lg p-2 hover:bg-slate-100 disabled:opacity-50"><Plus size={18}/></button><button aria-label="Xóa cuộc trò chuyện" title="Xóa cuộc trò chuyện" disabled={!sessionId || pending || loading} onClick={removeSession} className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30"><Trash2 size={18}/></button><button aria-label="Đổi kích thước" onClick={() => setIsFullscreen(!isFullscreen)} className="hidden rounded-lg p-2 hover:bg-slate-100 sm:block">{isFullscreen ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button><button aria-label="Đóng" onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100"><X size={19}/></button></div>
+    </header>
+    {sessions.length > 0 && <div className="flex gap-2 overflow-x-auto border-b border-slate-100 px-4 py-2">{sessions.map((s) => <button key={s.id} disabled={pending || loading} onClick={() => openSession(s.id)} className={`shrink-0 max-w-44 truncate rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${sessionId === s.id ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{s.title}</button>)}</div>}
+    <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-5 py-5" aria-live="polite">
+      {loading ? <p className="text-sm text-slate-500">Đang tải cuộc trò chuyện...</p> : messages.map((m) => <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${m.role === 'user' ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-800'}`}>{m.content}</div></div>)}
+      {pending && <p className="text-sm text-slate-500">Trợ lý đang trả lời...</p>}<div ref={endRef}/>
+    </div>
+    <div className="border-t border-slate-200 bg-white p-4">
+      {error && <p role="alert" className="mb-2 text-sm text-rose-700">{error}</p>}
+      <div className="flex items-end gap-2"><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} maxLength={1000} rows={2} placeholder="Ví dụ: Tháng này tôi chi bao nhiêu?" className="min-h-12 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-600"/><button aria-label="Gửi tin nhắn" disabled={pending || loading || !input.trim()} onClick={send} className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"><Send size={18}/></button></div>
+      <p className="mt-2 text-xs text-slate-500">Số liệu lấy từ tài khoản của bạn. Trợ lý chỉ trả lời, không tự lưu giao dịch.</p>
+    </div>
+  </aside>;
+}

@@ -1,5 +1,7 @@
 # SmartFin
 
+> Hướng dẫn nhập giao dịch bằng câu tiếng Việt (Mốc 2–6), cài model và đánh giá: [docs/NLP_MOC_2_DEN_6.md](docs/NLP_MOC_2_DEN_6.md).
+
 SmartFin là dự án nền tảng cho ứng dụng quản lý tài chính cá nhân. Repository hiện có giao diện React/Vite, API FastAPI, cấu hình PostgreSQL với pgvector và migration Alembic cho dữ liệu tài chính.
 
 hello world
@@ -327,3 +329,10 @@ smartfin/
     └── scripts/
         └── evaluate.py             # Chạy đánh giá và xuất kết quả
 ```
+# Chatbot Gemini
+
+Xem [hướng dẫn cấu hình và sử dụng chatbot](docs/CHATBOT_GEMINI.md).
+
+Quy trình thu dữ liệu và huấn luyện lại bộ phân loại danh mục: [docs/HUAN_LUYEN_NLP.md](docs/HUAN_LUYEN_NLP.md).
+
+Chạy trên PC có GPU bằng một lệnh: [docs/CHAY_TRAIN_TREN_PC_GPU.md](docs/CHAY_TRAIN_TREN_PC_GPU.md).

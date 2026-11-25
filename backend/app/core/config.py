@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "HEHE"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 999 
     REFRESH_TOKEN_EXPIRE_DAYS: int = 999
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    NLP_ENCODER_DIR: str = ""
+    NLP_EXAMPLES_CSV: str = ""
+    NLP_CATEGORY_K: int = 7
+    NLP_CATEGORY_THRESHOLD: float = 0.50
 
     @model_validator(mode="after")
     def restrict_otp_demo(self):

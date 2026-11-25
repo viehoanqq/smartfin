@@ -1,14 +1,76 @@
-import React, { useState } from 'react';
-import { Sparkles, Send } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Sparkles, Send, Loader2 } from 'lucide-react';
+import { nlpAPI } from '../../../services/nlpAPI';
+import NlpPreview from './NlpPreview';
 
 const TransactionForm = () => {
   const [smartText, setSmartText] = useState('');
+  const [drafts, setDrafts] = useState([]);
+  const [options, setOptions] = useState({ wallets: [], categories: [] });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const requestVersion = useRef(0);
 
-  const handleSmartSubmit = (e) => {
+  const handleSmartSubmit = async (e) => {
     e.preventDefault();
     if (!smartText.trim()) return;
-    console.log("🤖 Đang phân tích chuỗi thông minh:", smartText);
-    setSmartText('');
+    setError('');
+    setNotice('');
+    setLoading(true);
+    const version = ++requestVersion.current;
+    try {
+      const [parsed, available] = await Promise.all([nlpAPI.parseText(smartText), nlpAPI.getOptions()]);
+      if (version !== requestVersion.current) return;
+      setOptions(available);
+      setDrafts((parsed.drafts || []).map((draft) => ({ ...draft, predicted_category_id: draft.category_id })));
+    } catch (err) {
+      if (version !== requestVersion.current) return;
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Không phân tích được câu nhập. Vui lòng thử lại.');
+    } finally {
+      if (version === requestVersion.current) setLoading(false);
+    }
+  };
+
+  const changeDraft = (index, field, value) => setDrafts((old) => old.map((draft, i) => i === index ? { ...draft, [field]: value } : draft));
+
+  const saveDrafts = async () => {
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const payload = drafts.map((draft) => ({
+        wallet_id: Number(draft.wallet_id), category_id: Number(draft.category_id),
+        type: draft.type, amount: Number(draft.amount), txn_date: draft.txn_date,
+        note: draft.note.trim(), source: 'nlp', raw_text: draft.raw_text,
+        ai_confidence: draft.confidence,
+      }));
+      const saved = await nlpAPI.saveDrafts(payload);
+      let feedbackFailures = 0;
+      for (let i = 0; i < drafts.length; i += 1) {
+        const predicted = drafts[i].predicted_category_id;
+        if (drafts[i].type === 'expense') {
+          try {
+            await nlpAPI.saveFeedback({ transaction_id: saved[i].id, raw_text: drafts[i].raw_text,
+              predicted_category_id: predicted ?? null, corrected_category_id: Number(drafts[i].category_id) });
+          } catch (feedbackError) {
+            console.warn('Giao dịch đã lưu, chưa lưu được phản hồi danh mục', feedbackError);
+            feedbackFailures += 1;
+          }
+        }
+      }
+      setDrafts([]);
+      setSmartText('');
+      setNotice(feedbackFailures ? `Đã lưu ${saved.length} giao dịch, nhưng ${feedbackFailures} phản hồi danh mục chưa được ghi nhận.` : `Đã lưu ${saved.length} giao dịch.`);
+      window.dispatchEvent(new Event('smartfin-transactions-changed'));
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Không lưu được giao dịch. Bản xem trước vẫn được giữ lại.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -36,7 +98,8 @@ const TransactionForm = () => {
           <input 
             type="text" 
             value={smartText}
-            onChange={(e) => setSmartText(e.target.value)}
+            onChange={(e) => { requestVersion.current += 1; setLoading(false); setSmartText(e.target.value); setDrafts([]); setNotice(''); }}
+            maxLength={2000}
             placeholder="Ví dụ: Ăn phở bò 45k lúc sáng, đổ xăng 50k..." 
             className="flex-1 bg-transparent border-none text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-0 w-full px-1"
           />
@@ -44,13 +107,17 @@ const TransactionForm = () => {
           {/* Nút Ghi chép cao cấp */}
           <button 
             type="submit"
+            disabled={loading || saving || !smartText.trim()}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl py-3 px-7 flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-md shadow-blue-600/30 hover:scale-[1.02] active:scale-[0.98] shrink-0 w-full sm:w-auto"
           >
-            <Send size={16} />
-            <span>Ghi chép</span>
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            <span>{loading ? 'Đang phân tích...' : 'Xem trước'}</span>
           </button>
         </form>
       </div>
+      {error && !drafts.length && <p role="alert" className="mt-2 text-sm text-rose-300">{error}</p>}
+      {notice && <p role="status" className="mt-2 text-sm text-emerald-300">{notice}</p>}
+      {drafts.length > 0 && <NlpPreview drafts={drafts} options={options} onChange={changeDraft} onCancel={() => { setDrafts([]); setError(''); }} onSave={saveDrafts} saving={saving} error={error} />}
     </div>
   );
 };

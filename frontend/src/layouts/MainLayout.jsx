@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom'; // Hoặc dùng { children } tùy cấu trúc router của bạn
 import { MessageSquare } from 'lucide-react';
-import Sidebar from '../components/customer/Sidebar';
 import Header from '../components/customer/Header';
 import ChatbotPanel from '../components/customer/dashboard/ChatbotPanel';
 import { userAPI } from '../services/userAPI';
@@ -10,7 +9,6 @@ const MainLayout = () => {
   const [user, setUser] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -39,7 +37,7 @@ const MainLayout = () => {
         {/* Khung trượt Chatbot dùng chung */}
         <div 
           className={`transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shrink-0 ${
-            isChatOpen && !isFullscreen ? 'w-[380px]' : 'w-0'
+            isChatOpen && !isFullscreen ? 'hidden sm:block sm:w-[420px]' : 'w-0'
           }`}
         ></div>
 
@@ -48,8 +46,6 @@ const MainLayout = () => {
           onClose={() => setIsChatOpen(false)} 
           isFullscreen={isFullscreen} 
           setIsFullscreen={setIsFullscreen} 
-          message={chatMessage}
-          setMessage={setChatMessage}
         />
 
         {/* Nút bong bóng chat nổi góc phải dùng chung */}
