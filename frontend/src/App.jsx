@@ -16,6 +16,10 @@ import SavingDetail from './pages/customer/SavingDetail';
 import Wallets from './pages/customer/Wallets';
 import Budgets from './pages/customer/Budgets';
 
+import Customers from './pages/admin/Customers';
+import AdminTransactions from './pages/admin/AdminTransactions';
+import AdminCategories from './pages/admin/AdminCategories';
+
 
 
 import AdminLayout from './layouts/AdminLayout';
@@ -91,8 +95,11 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<AdminDashboard />} />
+            <Route index element={< Customers/>} />
             {/* sau này: <Route path="users" element={<AdminUsers />} /> -> /admin/users */}
+            <Route path="/admin/customers" element={<Customers/>} /> 
+            <Route path="/admin/transactions" element={<AdminTransactions/>} /> 
+            <Route path="/admin/categories" element={<AdminCategories/>} /> 
           </Route>
           
 

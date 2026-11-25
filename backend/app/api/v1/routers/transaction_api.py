@@ -1,7 +1,11 @@
 from datetime import date
+import typing
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 from app.core.deps import get_current_user
 from app.schemas.transaction import (
@@ -15,6 +19,55 @@ from app.schemas.transaction import (
 from app.services.transaction_service import TransactionService
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+
+def _ensure_admin(current_user):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ quản trị viên mới có quyền truy cập.",
+        )
+
+
+@router.get("/admin/all", tags=["Admin"])
+def get_all_transactions(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lấy tất cả giao dịch trong hệ thống cho admin"""
+    _ensure_admin(current_user)
+
+    sql = """
+        SELECT
+            t.*,
+            u.email AS user_email,
+            c.name AS category_name
+        FROM transactions t
+        LEFT JOIN users u ON u.id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id
+        ORDER BY t.id DESC
+    """
+    rows = db.execute(text(sql)).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.delete("/admin/{txn_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Admin"])
+def admin_delete_transaction(
+    txn_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Admin xóa giao dịch theo ID"""
+    _ensure_admin(current_user)
+
+    res = db.execute(text("DELETE FROM transactions WHERE id = :id"), {"id": txn_id})
+    if res.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy giao dịch.",
+        )
+    db.commit()
+    return None
 
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
@@ -54,11 +107,12 @@ def restore_transaction(
     return TransactionService.restore_transaction(db=db, user_id=current_user.id, txn_id=txn_id)
 
 
+# 1. GET /transactions?from&to&category&wallet&type&q&page
 @router.get("", response_model=PaginatedTransactionResponse)
 def get_transactions(
     from_date: Optional[date] = Query(None, alias="from", description="Từ ngày (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, alias="to", description="Đến ngày (YYYY-MM-DD)"),
-    category_id: Optional[int] = Query(None, description="Lọc theo category_id"),
+    category: Optional[int] = Query(None, description="Lọc theo category_id"),
     wallet: Optional[int] = Query(None, description="Lọc theo wallet_id"),
     type: Optional[str] = Query(None, pattern="^(income|expense|saving)$"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm trong ghi chú"),
@@ -73,7 +127,7 @@ def get_transactions(
         user_id=current_user.id,
         from_date=from_date,
         to_date=to_date,
-        category_id=category_id,
+        category_id=category,
         wallet_id=wallet,
         txn_type=type,
         q=q,
@@ -82,6 +136,7 @@ def get_transactions(
     )
 
 
+# 2. POST /transactions/bulk (Tạo nhiều giao dịch cùng lúc - Dùng cho NLP & Import Commit)
 @router.post("/bulk", response_model=List[TransactionResponse], status_code=status.HTTP_201_CREATED)
 def create_bulk_transactions(
     bulk_in: TransactionBulkCreate,
@@ -91,15 +146,21 @@ def create_bulk_transactions(
     return TransactionService.create_bulk_transactions(db=db, user_id=current_user.id, bulk_in=bulk_in)
 
 
+# 3. POST /transactions/import (Preview file CSV trước khi lưu)
 @router.post("/import", response_model=List[ImportPreviewItem])
 def import_transactions_preview(
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
     db=Depends(get_db),
 ):
+    """
+    Bước 1 (Preview): Tải file CSV lên để kiểm tra lỗi từng dòng.
+    Bước 2 (Commit): Sau khi user xem bảng preview trên FE và bấm Lưu, FE lấy các dòng hợp lệ gọi vào POST /transactions/bulk.
+    """
     return TransactionService.preview_import_csv(db=db, user_id=current_user.id, file=file)
 
 
+# 4. GET /transactions/export (Xuất file CSV)
 @router.get("/export")
 def export_transactions(
     from_date: Optional[date] = Query(None, alias="from"),
