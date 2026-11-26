@@ -36,7 +36,7 @@ def main():
             NLPFeedback.user_id == args.user_id,
             Transaction.user_id == args.user_id,
             Transaction.source == "nlp",
-            Transaction.type == "expense",
+            Transaction.type.in_(["expense", "income"]),
             Transaction.delete_at.is_(None),
         ).order_by(NLPFeedback.id).all()
         for feedback, txn, category in feedbacks:

@@ -13,10 +13,16 @@ from .wallet_matcher import match_wallet
 INCOME = re.compile(
     r"\b(nhận lương|lương|được trả|được chuyển|thu nhập|tiền thưởng|được thưởng|"
     r"thưởng tết|thưởng quý|thưởng tháng|thưởng dự án|thưởng doanh số|thưởng nóng|thưởng kpi|"
-    r"hoa hồng|bán được|nhận tiền|thu nợ|thu hồi nợ|đòi được nợ|hoàn tiền|được hoàn tiền|"
-    r"lãi tiết kiệm|tiền lãi|cổ tức)\b"
+    r"hoa hồng|bán được|bán đồ cũ|bán lại|thanh lý|nhận tiền|thu nợ|thu hồi nợ|đòi được nợ|"
+    r"hoàn tiền|được hoàn tiền|lãi tiết kiệm|tiền lãi|cổ tức|"
+    r"bạn trả|đồng nghiệp trả|khách trả|người quen trả|được lì xì|nhận lì xì|được tặng)\b"
 )
-EXPENSE = re.compile(r"\b(ăn|uống|mua|trả|đổ xăng|cafe|cà phê|gửi xe|đi|thanh toán|chi|chuyển khoản)\b")
+EXPENSE = re.compile(
+    r"\b(ăn|uống|mua|trả|đóng|nộp|thuê|đặt xe|đặt grab|đặt đồ|đặt cơm|đặt vé|đặt phòng|đặt hàng|đặt bàn|"
+    r"gọi xe|gọi grab|gọi be|gọi đồ|gọi thợ|nạp|gia hạn|sửa|thay|rửa|bơm|vá|"
+    r"khám|tiêm|nhổ|trám|giặt|ủi|cắt|photo|in ấn|in tài liệu|in ảnh|in luận văn|"
+    r"gửi tiền|biếu|mừng|lì xì|tặng|đổ xăng|cafe|cà phê|trà sữa|bún|phở|cơm|gửi xe|đi|thanh toán|chi|chuyển khoản)\b"
+)
 
 
 def _clean_note(text: str) -> str:
@@ -50,7 +56,9 @@ def parse_transactions(
         wallet = match_wallet(when.remaining, wallets, default_wallet_id)
         note = _clean_note(wallet.remaining)
         is_income = bool(INCOME.search(note))
-        is_expense = bool(EXPENSE.search(note))
+        # Strip matched income phrases first so phrases like "được trả", "được lì xì", "được tặng"
+        # do not also trigger EXPENSE on "trả", "lì xì", or "tặng".
+        is_expense = bool(EXPENSE.search(INCOME.sub(" ", note)))
         warnings = list(split.warnings) + list(amount.warnings) + list(when.warnings) + list(wallet.warnings)
         if is_income and not is_expense:
             txn_type = "income"

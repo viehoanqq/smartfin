@@ -1,8 +1,10 @@
 from functools import lru_cache
 from pathlib import Path
 import os
+import threading
 
 MODEL_DIR = Path(__file__).resolve().parents[3] / "models" / "vncorenlp"
+_SEGMENT_LOCK = threading.Lock()
 
 
 @lru_cache(maxsize=1)
@@ -21,4 +23,5 @@ def segment(text: str) -> str:
     model = get_segmenter()
     if model is None:
         raise RuntimeError("Chưa tải VnCoreNLP")
-    return " ".join(model.word_segment(text))
+    with _SEGMENT_LOCK:
+        return " ".join(model.word_segment(text))

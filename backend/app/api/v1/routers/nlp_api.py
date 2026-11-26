@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.ai.nlp_parser.parser import parse_transactions
+from app.core.config import settings
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.domain import Category, NLPFeedback, Transaction, Wallet
@@ -11,6 +12,8 @@ from app.ai.classifier.service import get_classifier
 from app.ai.classifier.ner import extract_entities
 
 router = APIRouter(prefix="/nlp", tags=["NLP"])
+_AMBIGUOUS_NOTES = frozenset({"tiền", "khoản", "giao dịch", "chi", "thu"})
+_TYPE_INFER_THRESHOLD = max(0.65, settings.NLP_CATEGORY_THRESHOLD)
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -23,14 +26,23 @@ def parse_text(body: ParseRequest, user=Depends(get_current_user), db: Session =
     classifier = get_classifier()
     for draft in result["drafts"]:
         note = draft["note"]
-        if note and draft["type"] == "expense":
-            suggestion = classifier.predict(note, db=db, user_id=user.id)
+        if note and draft["type"] in ("expense", "income", None) and not (
+            draft["type"] is None and note.strip().lower() in _AMBIGUOUS_NOTES
+        ):
+            suggestion = classifier.predict(note, db=db, user_id=user.id, txn_type=draft["type"])
             if suggestion:
                 draft["suggestions"] = suggestion["suggestions"]
                 draft["confidence"] = suggestion["score"]
                 draft["category_id"] = suggestion["category_id"]
                 if draft["category_id"]:
                     draft["warnings"] = [w for w in draft["warnings"] if w != "Chọn danh mục"]
+                    if (
+                        draft["type"] is None
+                        and suggestion.get("inferred_type") in ("expense", "income")
+                        and suggestion["score"] >= _TYPE_INFER_THRESHOLD
+                    ):
+                        draft["type"] = suggestion["inferred_type"]
+                        draft["warnings"] = [w for w in draft["warnings"] if w != "Chọn loại thu hoặc chi"]
         entities = extract_entities(draft["raw_text"])
         draft.update(entities)
     return result

@@ -51,7 +51,7 @@ const TransactionForm = () => {
       let feedbackFailures = 0;
       for (let i = 0; i < drafts.length; i += 1) {
         const predicted = drafts[i].predicted_category_id;
-        if (drafts[i].type === 'expense') {
+        if (['expense', 'income'].includes(drafts[i].type)) {
           try {
             await nlpAPI.saveFeedback({ transaction_id: saved[i].id, raw_text: drafts[i].raw_text,
               predicted_category_id: predicted ?? null, corrected_category_id: Number(drafts[i].category_id) });

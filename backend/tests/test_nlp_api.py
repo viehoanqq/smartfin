@@ -78,6 +78,50 @@ def test_parse_is_draft_only_and_owned_wallet():
         app.dependency_overrides.clear()
 
 
+def test_parse_calls_classifier_for_income_expense_and_short_notes(monkeypatch):
+    from app.api.v1.routers import nlp_api
+    from app.schemas.nlp import ParseRequest
+
+    db = FakeDb()
+    db.categories = [
+        SimpleNamespace(id=2, name="Di chuyển", is_hidden=False),
+        SimpleNamespace(id=3, name="Ăn uống", is_hidden=False),
+        SimpleNamespace(id=13, name="Lương", is_hidden=False),
+    ]
+    calls = []
+
+    class StubClassifier:
+        def predict(self, note, db, user_id, txn_type=None):
+            calls.append((note, txn_type))
+            if txn_type == "income":
+                return {"category_id": 13, "score": 0.91, "inferred_type": "income",
+                        "suggestions": [{"category_id": 13, "category_name": "Lương", "score": 0.91}]}
+            if "vé xe" in note:
+                return {"category_id": 2, "score": 0.93, "inferred_type": "expense",
+                        "suggestions": [{"category_id": 2, "category_name": "Di chuyển", "score": 0.93}]}
+            return {"category_id": 3, "score": 0.90, "inferred_type": "expense",
+                    "suggestions": [{"category_id": 3, "category_name": "Ăn uống", "score": 0.90}]}
+
+    monkeypatch.setattr(nlp_api, "get_classifier", lambda: StubClassifier())
+    result = nlp_api.parse_text(
+        ParseRequest(text="nhận lương 10 triệu, vé xe 50k, ăn phở 45k"),
+        user=SimpleNamespace(id=1),
+        db=db,
+    )
+    drafts = result["drafts"]
+    assert len(drafts) == 3
+    assert drafts[0]["type"] == "income" and drafts[0]["category_id"] == 13
+    assert drafts[1]["type"] == "expense" and drafts[1]["category_id"] == 2
+    assert "Chọn loại thu hoặc chi" not in drafts[1]["warnings"]
+    assert drafts[2]["type"] == "expense" and drafts[2]["category_id"] == 3
+    assert [c[1] for c in calls] == ["income", None, "expense"]
+
+    ambiguous = nlp_api.parse_text(ParseRequest(text="tiền 40k"), user=SimpleNamespace(id=1), db=db)["drafts"][0]
+    assert ambiguous["type"] is None
+    assert ambiguous["category_id"] is None
+    assert "Chọn loại thu hoặc chi" in ambiguous["warnings"]
+
+
 def test_feedback_cannot_use_another_users_transaction():
     db = FakeDb()
     app.dependency_overrides[get_db] = lambda: db

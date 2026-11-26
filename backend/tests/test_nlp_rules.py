@@ -86,6 +86,14 @@ def test_parser_two_drafts_inherit_date_and_preserve_raw():
 def test_parser_income_and_unknown_type():
     income = parse_transactions("nhận lương 10 triệu", WALLETS, NOW)["drafts"][0]
     assert income["type"] == "income"
+    assert parse_transactions("thưởng tết 5 triệu", WALLETS, NOW)["drafts"][0]["type"] == "income"
+    assert parse_transactions("thu nợ 500k", WALLETS, NOW)["drafts"][0]["type"] == "income"
+    assert parse_transactions("bạn trả nợ 500k", WALLETS, NOW)["drafts"][0]["type"] == "income"
+    assert parse_transactions("được lì xì 500k", WALLETS, NOW)["drafts"][0]["type"] == "income"
+    assert parse_transactions("hoàn tiền 50k", WALLETS, NOW)["drafts"][0]["type"] == "income"
+    assert parse_transactions("đóng tiền học 800k", WALLETS, NOW)["drafts"][0]["type"] == "expense"
+    assert parse_transactions("lì xì các cháu 500k", WALLETS, NOW)["drafts"][0]["type"] == "expense"
+    assert parse_transactions("ăn tối thưởng thức món mới 200k", WALLETS, NOW)["drafts"][0]["type"] == "expense"
     unknown = parse_transactions("tiền 40k", WALLETS, NOW)["drafts"][0]
     assert unknown["type"] is None
     assert unknown["needs_confirmation"]
