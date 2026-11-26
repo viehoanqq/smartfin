@@ -2,6 +2,7 @@
 import argparse
 import csv
 import json
+import os
 import re
 import subprocess
 import sys
@@ -54,6 +55,13 @@ def require_environment(allow_cpu: bool):
         raise SystemExit("Missing Bi-Encoder. From backend/ run: python scripts/download_nlp_models.py biencoder")
     if not (BACKEND / "models" / "vncorenlp" / "VnCoreNLP-1.2.jar").exists():
         raise SystemExit("Missing VnCoreNLP. From backend/ run: python scripts/download_nlp_models.py vncorenlp")
+    java_home = os.environ.get("JAVA_HOME")
+    if not java_home or not Path(java_home).is_dir():
+        raise SystemExit(
+            "JAVA_HOME is not set or does not point to an existing JDK folder. "
+            "PyJNIus/VnCoreNLP requires JAVA_HOME even when java is on PATH. "
+            "In PowerShell, set $env:JAVA_HOME to your JDK install folder (not its bin folder), then rerun."
+        )
     try:
         java_ok = subprocess.run(["java", "-version"], capture_output=True).returncode == 0
     except FileNotFoundError:
@@ -76,6 +84,8 @@ def require_environment(allow_cpu: bool):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Prepare, benchmark, fine-tune and validate SmartFin category model.")
     parser.add_argument("--reviewed", type=Path, required=True, help="CSV: text,category_name,reviewed")
     parser.add_argument("--run-name", required=True, help="Unique run name, for example run1")
