@@ -17,9 +17,6 @@ ENV/
 .ruff_cache/
 .tox/
 backend/models/
-ml/data/feedback_review_user_*.csv
-ml/data/reviewed*.csv
-ml/data/runs/
 htmlcov/
 .coverage
 .coverage.*

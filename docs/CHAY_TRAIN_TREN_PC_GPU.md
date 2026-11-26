@@ -1,32 +1,42 @@
 # Train NLP SmartFin trên PC có GPU
 
-Script chính: `ml/run_gpu_training.py`. Nó kiểm tra nhãn và CUDA, chia dữ liệu, đo Bi-Encoder gốc và TF-IDF trên validation, fine-tune bản sao Bi-Encoder, đo lại trên cùng validation, rồi in lệnh đánh giá test và cấu hình chạy API. **Nó không tự bật model mới** nếu kết quả kém.
+Script chính: `ml/run_gpu_training.py`. Nó kiểm tra nhãn và CUDA, chia dữ liệu (`train` / `validation` / `test`), đo Bi-Encoder gốc và TF-IDF baseline trên `validation`, fine-tune bản sao Bi-Encoder, đo lại trên cùng `validation`, rồi in lệnh đánh giá `test` và cấu hình chạy API. **Script không tự bật model mới** nếu kết quả kém.
 
-## 1. Mang gì sang PC GPU
+---
 
-- Toàn bộ mã nguồn `SmartFin`; tạo venv mới trên PC GPU, không chép `backend/venv` từ máy cũ.
-- File có nhãn đã duyệt `ml/data/reviewed_labels.csv` (bị Git bỏ qua nên phải chép riêng nếu clone bằng Git). Mỗi dòng: `text,category_name,reviewed`, chỉ `reviewed=1` mới được dùng.
-- Có thể chép `backend/models/biencoder` và `backend/models/vncorenlp` từ máy cũ để khỏi tải lại. Nếu không, bước 3 sẽ tải chúng. Không cần DB, backend server hay Gemini key trên PC train.
+## 1. Dữ liệu đầu vào hiện tại & cần mang gì sang PC GPU
 
-Hiện máy làm việc có 0 phản hồi NLP và CSV mẫu chỉ 10 câu cho mỗi trong 3 danh mục. Nhóm cần gán nhãn trước: ít nhất 20 câu khác nhau/danh mục để script chạy; nên có 70–100+ câu/danh mục nếu muốn đánh giá có ý nghĩa. Không tạo nhiều biến thể gần như giống hệt để đủ số lượng.
+Hiện dự án đã chuẩn bị sẵn `ml/data/reviewed_labels.csv` gồm **3.030 câu** (`reviewed=1`) cho **16 danh mục** (15 danh mục chính × 200 câu + `Khác` 30 câu), chia chuẩn thành:
+- `train.csv`: **2.122 câu** (`140` mỗi danh mục chính, `22` cho `Khác`)
+- `validation.csv`: **454 câu** (`30` mỗi danh mục chính, `4` cho `Khác`)
+- `test.csv`: **454 câu** (`30` mỗi danh mục chính, `4` cho `Khác`)
 
-Nếu đã có giao dịch nhập thông minh trên PC cũ, từ thư mục `SmartFin` xuất dữ liệu:
+### Cần mang sang PC GPU (USB / Google Drive / Git)
+- Toàn bộ mã nguồn `SmartFin` (**không chép `backend/venv`** từ máy cũ, tạo venv mới trên máy GPU).
+- File **`ml/data/reviewed_labels.csv`** (kiểm tra chắc chắn file có mặt ở `ml/data/` nếu clone qua Git).
+- **Rất nên chép sẵn** 2 thư mục model từ máy cũ sang để tiết kiệm thời gian tải:
+  - `backend/models/biencoder/` (~517 MB)
+  - `backend/models/vncorenlp/` (~27 MB)
+- Không cần PostgreSQL, backend server hay Gemini API key trên PC train.
 
-```powershell
-.\backend\venv\Scripts\python.exe ml/export_feedback_for_review.py --user-id 1
-```
+*(Nếu sau này muốn bổ sung thêm dữ liệu thật từ giao dịch người dùng đã lưu trên máy cũ, chạy `.\backend\venv\Scripts\python.exe ml/export_feedback_for_review.py --user-id 1`, duyệt cột `reviewed=1` rồi gộp vào `ml/data/reviewed_labels.csv`.)*
 
-Mở `ml/data/feedback_review_user_1.csv`, kiểm tra từng nhãn và thông tin riêng tư, điền `reviewed=1` cho hàng đúng rồi chép thành `ml/data/reviewed_labels.csv`. Có thể gộp CSV của nhiều người dùng khi đã được phép sử dụng dữ liệu của họ. Hiện file xuất sẽ rỗng vì DB chưa có phản hồi; nhóm có thể tự tạo `reviewed_labels.csv` từ các câu được gán nhãn thủ công.
+---
 
 ## 2. Cài Python, Java và PyTorch có CUDA
 
-Mở PowerShell tại thư mục `SmartFin`. Cần Python 3.11+ và Java trong PATH (`java -version`). Tạo venv:
+Mở PowerShell tại thư mục `SmartFin`. Cần **Python 3.11+** (`python --version`) và **Java** trên PATH (`java -version`, bắt buộc cho VnCoreNLP).
+
+Tạo môi trường ảo mới:
 
 ```powershell
 python -m venv backend/venv
 ```
 
-Chọn **Windows → Pip → Python → CUDA phù hợp GPU** trên [trang cài PyTorch chính thức](https://pytorch.org/get-started/locally/), sau đó chạy lệnh pip họ đưa ra bằng **`.\backend\venv\Scripts\python.exe -m pip ...`**. Đừng lấy lệnh CUDA bất kỳ từ máy khác. Tiếp theo cài thư viện dự án:
+Vào [trang cài PyTorch chính thức](https://pytorch.org/get-started/locally/), chọn **Windows → Pip → Python → CUDA phù hợp với GPU**, rồi chạy lệnh pip họ cung cấp bằng **`.\backend\venv\Scripts\python.exe -m pip ...`**:
+- **Lưu ý quan trọng với GPU dòng RTX 50-series (ví dụ RTX 5060, kiến trúc Blackwell):** phải chọn bản **CUDA 12.8 (`cu128`)** trở lên; các bản CUDA cũ hơn (`cu121`/`cu124`) có thể không chạy được trên kiến trúc GPU mới.
+
+Sau khi cài xong PyTorch CUDA, cài tiếp thư viện train và kiểm tra GPU:
 
 ```powershell
 cd backend
@@ -35,9 +45,11 @@ cd ..
 .\backend\venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO CUDA')"
 ```
 
-Kết quả phải có `True` và tên GPU. Nếu là `False`, chưa chạy lệnh train: kiểm tra driver và bản PyTorch CUDA vừa cài.
+Kết quả **bắt buộc** phải có `True` và tên GPU. Nếu in `False`, kiểm tra lại driver NVIDIA và bản PyTorch CUDA vừa cài trước khi chạy train.
 
-## 3. Tải model đầu vào nếu chưa chép từ máy cũ
+---
+
+## 3. Tải model gốc (bỏ qua nếu đã chép ở bước 1)
 
 ```powershell
 cd backend
@@ -45,45 +57,73 @@ cd backend
 cd ..
 ```
 
-Đầu ra cần có `backend/models/vncorenlp/VnCoreNLP-1.2.jar` và `backend/models/biencoder/modules.json`. Không cần tải PhoNLP cho bài toán phân loại danh mục.
+Kiểm tra đã có `backend/models/vncorenlp/VnCoreNLP-1.2.jar` và `backend/models/biencoder/modules.json`. Không cần tải PhoNLP cho bài toán phân loại danh mục.
 
-## 4. Chạy một lệnh kiểm tra, rồi một lệnh train
+---
+
+## 4. Kiểm tra, train và thử cấu hình tốt nhất
+
+Trên RTX 5060 với 2.122 câu train, mỗi lượt fine-tune 3–5 epoch chỉ mất **vài phút**. Với **16 danh mục**, nên dùng `--batch-size 32` (hoặc `16`) để `GroupByLabelBatchSampler` gom nhiều nhãn vào cùng 1 batch cho `BatchHardTripletLoss`.
+
+> **Không tăng `--epochs` quá cao** (ví dụ 10–15+): tập `train.csv` cỡ vừa dễ bị học vẹt (overfitting) làm tụt điểm trên câu mới, và script chỉ lưu trạng thái ở epoch cuối cùng. Nên thử lần lượt `3, 4, 5` epoch trên **cùng tập chia** bằng `--reuse-split` và chọn mức đạt đỉnh trên `validation`.
+
+Chạy lần lượt từ thư mục `SmartFin`:
 
 ```powershell
+# 1. Kiểm tra dữ liệu, Java, model gốc và CUDA trước khi train
 .\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --check-only
-.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --epochs 2 --batch-size 8
+
+# 2. Chạy lượt đầu (tạo split + đo gốc + TF-IDF + train 3 epoch, batch 32)
+.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --epochs 3 --batch-size 32
+
+# 3. Thử các mức epoch và batch-size khác trên CÙNG tập chia (không dùng lại --model-name cũ)
+.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --reuse-split --model-name run1_e4_b32 --epochs 4 --batch-size 32
+.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --reuse-split --model-name run1_e5_b32 --epochs 5 --batch-size 32
+.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --reuse-split --model-name run1_e3_b16 --epochs 3 --batch-size 16
+.\backend\venv\Scripts\python.exe ml/run_gpu_training.py --reviewed ml/data/reviewed_labels.csv --run-name run1 --reuse-split --model-name run1_e4_b16 --epochs 4 --batch-size 16
 ```
 
-Nếu hết VRAM, dùng `--batch-size 4`. Nếu dữ liệu mới chưa đủ, script dừng trước khi train và báo danh mục thiếu. Để thử số epoch khác trên **cùng một tập chia**, chạy với `--reuse-split --model-name run1_3epoch --epochs 3` (vẫn giữ `--run-name run1`). Không dùng lại tên model đã tồn tại.
+Nếu bị hết VRAM, giảm xuống `--batch-size 8` hoặc `4`. Nếu sau khi xem báo cáo `validation` bạn bổ sung thêm câu mới vào `reviewed_labels.csv`, hãy đổi sang `--run-name run2` (không ghi đè `run1`).
 
-Đầu ra:
+### Đầu ra sinh ra
 
 | Đường dẫn | Nội dung |
 |---|---|
 | `ml/data/runs/run1/train.csv` | Câu mẫu cho k-NN và fine-tune |
-| `ml/data/runs/run1/validation.csv` | Chọn model, k và ngưỡng |
-| `ml/data/runs/run1/test.csv` | Đánh giá cuối, không dùng lúc chỉnh |
-| `backend/models/biencoder_run1/` | Model đã fine-tune |
-| `ml/data/runs/run1/validation_report_run1.txt` | Điểm validation trước/sau train và baseline |
-| `ml/data/runs/run1/manifest_run1.json` | Thông số lượt train |
+| `ml/data/runs/run1/validation.csv` | Chọn model, `K` và `threshold` |
+| `ml/data/runs/run1/test.csv` | Đánh giá cuối (không dùng lúc chỉnh tham số) |
+| `backend/models/biencoder_<model_name>/` | Thư mục trọng số model đã fine-tune |
+| `ml/data/runs/run1/validation_report_<model_name>.txt` | Điểm validation trước/sau train và TF-IDF baseline |
+| `ml/data/runs/run1/manifest_<model_name>.json` | Thông số lượt train |
 
-## 5. Chọn model và đưa về máy chạy ứng dụng
+---
 
-Đọc hai dòng **validation macro-F1** trước/sau train; xem thêm các danh mục dễ nhầm và tỷ lệ câu `Chưa rõ`. Nếu bản mới không tốt hơn, **giữ model gốc** và cải thiện dữ liệu/nhãn trước. Nếu chọn bản mới, chạy test **một lần**:
+## 5. Chọn model tốt nhất, test cuối và đưa về máy chạy ứng dụng
+
+1. Mở các file `ml/data/runs/run1/validation_report_*.txt`, so sánh dòng **`validation macro-F1`** (và `accuracy`) giữa Bi-Encoder gốc, TF-IDF và các bản fine-tune.
+2. Chọn đúng **1 model** có `validation macro-F1` cao nhất (nếu tất cả bản fine-tune đều thấp hơn model gốc thì giữ model gốc và cải thiện lại dữ liệu trước).
+3. Chạy đánh giá trên `test.csv` **một lần duy nhất** cho model được chọn (thay `<model_tot_nhat>` bằng tên tương ứng, ví dụ `run1_e4_b32`):
 
 ```powershell
-.\backend\venv\Scripts\python.exe ml/evaluate_nlp.py --data-dir ml/data/runs/run1 --model-dir backend/models/biencoder_run1
+.\backend\venv\Scripts\python.exe ml/evaluate_nlp.py --data-dir ml/data/runs/run1 --model-dir backend/models/biencoder_<model_tot_nhat>
 ```
 
-Chép `backend/models/biencoder_run1/` và **`ml/data/runs/run1/train.csv`** về đúng vị trí tương ứng trên máy chạy SmartFin. Trong `backend/.env` của máy chạy ứng dụng, thêm:
+Ghi lại các giá trị **`k`** và **`threshold`** mà lệnh in ra.
+
+4. **Mang gì về từ PC GPU:**
+   - Thư mục `backend/models/biencoder_<model_tot_nhat>/`
+   - File `ml/data/runs/run1/train.csv`
+   - Các file `ml/data/runs/run1/validation_report_*.txt` và `manifest_*.json` (để lưu số liệu đối chiếu)
+
+5. **Cấu hình chạy trên máy SmartFin (`backend/.env`):**
 
 ```dotenv
-NLP_ENCODER_DIR=models/biencoder_run1
+NLP_ENCODER_DIR=models/biencoder_<model_tot_nhat>
 NLP_EXAMPLES_CSV=ml/data/runs/run1/train.csv
 NLP_CATEGORY_K=7
 NLP_CATEGORY_THRESHOLD=0.50
 ```
 
-Thay `K` và ngưỡng bằng kết quả validation mà script in ra. Khởi động lại backend rồi thử `POST /api/v1/nlp/parse` với câu **chưa từng nằm trong train/validation/test**. Muốn quay lại bản gốc thì xóa hai dòng `NLP_ENCODER_DIR`, `NLP_EXAMPLES_CSV` và khởi động lại.
+Thay `NLP_CATEGORY_K` và `NLP_CATEGORY_THRESHOLD` đúng bằng giá trị validation đã chọn, rồi khởi động lại backend và thử `POST /api/v1/nlp/parse` với các câu mới chưa từng nằm trong `train`/`validation`/`test`. Muốn quay lại model gốc thì xóa hai dòng `NLP_ENCODER_DIR`, `NLP_EXAMPLES_CSV` và khởi động lại.
 
-Số tiền, ngày, ví và tách nhiều giao dịch vẫn do parser luật xử lý. Script này chỉ huấn luyện gợi ý **danh mục chi**; Gemini chatbot và PhoNLP không thay đổi.
+> **Lưu ý về 4 danh mục Thu (`Lương`, `Thưởng`, `Thu nợ`, `Thu nhập khác`):** dữ liệu train mới đã bao gồm cả 12 danh mục chi và 4 danh mục thu. Hiện API (`backend/app/api/v1/routers/nlp_api.py`) đang chỉ gọi classifier cho giao dịch `expense`; sau khi đem model về, cần cập nhật thêm nhánh gợi ý và lọc danh mục theo loại `income`/`expense` ở backend nếu muốn bật gợi ý tự động cho khoản thu trên giao diện.

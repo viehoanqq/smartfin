@@ -10,7 +10,12 @@ from .splitter import split_transactions
 from .time_parser import parse_time
 from .wallet_matcher import match_wallet
 
-INCOME = re.compile(r"\b(nhận lương|lương|được trả|được chuyển|thu nhập|tiền thưởng|bán được|nhận tiền)\b")
+INCOME = re.compile(
+    r"\b(nhận lương|lương|được trả|được chuyển|thu nhập|tiền thưởng|được thưởng|"
+    r"thưởng tết|thưởng quý|thưởng tháng|thưởng dự án|thưởng doanh số|thưởng nóng|thưởng kpi|"
+    r"hoa hồng|bán được|nhận tiền|thu nợ|thu hồi nợ|đòi được nợ|hoàn tiền|được hoàn tiền|"
+    r"lãi tiết kiệm|tiền lãi|cổ tức)\b"
+)
 EXPENSE = re.compile(r"\b(ăn|uống|mua|trả|đổ xăng|cafe|cà phê|gửi xe|đi|thanh toán|chi|chuyển khoản)\b")
 
 
