@@ -26,7 +26,8 @@ class TransactionService:
             )
 
     @staticmethod
-    def _attach_and_sync_budget(db: Session, user_id: int, txn, txn_type: str, category_id: Optional[int], txn_date):
+    def _attach_and_sync_budget(db: Session, user_id: int, txn, txn_type: str, category_id: Optional[int], txn_date,
+                                old_budget_id: Optional[int] = None):
         matched_budget = (
             BudgetService.find_matching_budget(db, user_id, category_id, txn_date)
             if txn_type == "expense"
@@ -38,8 +39,8 @@ class TransactionService:
             txn.budget_id = new_budget_id
             db.flush()
 
-        if new_budget_id:
-            BudgetService.sync_budget_spent(db, new_budget_id)
+        for budget_id in sorted({bid for bid in (old_budget_id, new_budget_id) if bid is not None}):
+            BudgetService.sync_budget_spent(db, budget_id, user_id=user_id)
 
     @staticmethod
     def _attach_and_sync_saving(db: Session, user_id: int, txn, data: TransactionCreate):
@@ -178,10 +179,9 @@ class TransactionService:
                 txn=updated_txn,
                 txn_type=new_type,
                 category_id=new_category_id,
-                txn_date=new_txn_date
+                txn_date=new_txn_date,
+                old_budget_id=old_budget_id,
             )
-            if old_budget_id and old_budget_id != getattr(updated_txn, "budget_id", None):
-                BudgetService.sync_budget_spent(db, old_budget_id)
 
             db.commit()
             db.refresh(updated_txn)
@@ -210,7 +210,7 @@ class TransactionService:
         try:
             transaction_repo.soft_delete_transaction_atomic(db, txn, wallet, revert_delta)
             if old_budget_id:
-                BudgetService.sync_budget_spent(db, old_budget_id)
+                BudgetService.sync_budget_spent(db, old_budget_id, user_id=user_id)
             db.commit()
             return {"message": "Đã xóa giao dịch"}
         except HTTPException:
@@ -329,8 +329,8 @@ class TransactionService:
 
             if synced_budget_ids:
                 db.flush()
-                for b_id in synced_budget_ids:
-                    BudgetService.sync_budget_spent(db, b_id)
+                for b_id in sorted(synced_budget_ids):
+                    BudgetService.sync_budget_spent(db, b_id, user_id=user_id)
 
             db.commit()
             return created_txns

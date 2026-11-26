@@ -28,7 +28,12 @@ def override_get_db():
     yield db
 
 @pytest.fixture(autouse=True)
-def setup_mocks():
+def setup_mocks(monkeypatch):
+    from app.db import session as db_module
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Application database access is forbidden in tests')
+    monkeypatch.setattr(db_module.engine, 'connect', forbidden)
+    monkeypatch.setattr(db_module, 'SessionLocal', forbidden)
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[get_db] = override_get_db
     yield
@@ -308,3 +313,221 @@ def test_export_transactions_csv(monkeypatch):
     csv_text = response.text
     assert "Cơm trưa văn phòng" in csv_text
     assert "50000" in csv_text
+# Budget notifications: integration coverage on a private database, never PostgreSQL.
+@pytest.fixture
+def budget_db(setup_mocks, monkeypatch):
+    from sqlalchemy import create_engine, MetaData, Integer, JSON
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
+    from app.db import session as db_module
+    from app.models import Category, Budget, Notification
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Application database access is forbidden in tests')
+    monkeypatch.setattr(db_module.engine, 'connect', forbidden)
+    monkeypatch.setattr(db_module, 'SessionLocal', forbidden)
+    engine = create_engine('sqlite+pysqlite:///:memory:', poolclass=StaticPool,
+                           connect_args={'check_same_thread': False})
+    assert engine.dialect.name == 'sqlite' and engine.url.database == ':memory:'
+    metadata = MetaData()
+    for model in (User, Wallet, Category, Budget, Transaction, Notification):
+        table = model.__table__.to_metadata(metadata)
+        table.c.id.type = Integer()
+        if model is Category:
+            table.c.keywords.type = JSON()
+    metadata.create_all(engine)
+    db = Session(engine, autoflush=False)
+    app.dependency_overrides[get_db] = lambda: db
+    db.add_all([User(id=1, email='budget@example.com', password_hash='unused', role='user'),
+                User(id=2, email='other@example.com', password_hash='unused', role='user'),
+                Category(id=1, name='Food'), Category(id=2, name='Travel')])
+    db.flush()
+    db.add_all([Wallet(id=1, user_id=1, name='Main', initial_balance=10000, balance=10000),
+                Wallet(id=2, user_id=2, name='Other', initial_balance=10000, balance=10000),
+                Budget(id=1, user_id=1, category_id=1, budget_amount=1000, current_amount=0),
+                Budget(id=2, user_id=1, category_id=2, budget_amount=1000, current_amount=0),
+                Budget(id=3, user_id=2, category_id=1, budget_amount=1000, current_amount=0)])
+    db.commit()
+    try:
+        yield db
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def budget_create(amount, **extra):
+    return client.post('/api/v1/transactions', json={
+        'wallet_id': 1, 'category_id': 1, 'type': 'expense', 'amount': amount, **extra})
+
+
+def budget_notices(db):
+    from sqlalchemy import select
+    from app.models import Notification
+    return db.scalars(select(Notification).order_by(Notification.id)).all()
+
+
+@pytest.mark.parametrize('amount,expected', [(799, []), (800, ['budget_80']),
+    (999, ['budget_80']), (1000, ['budget_100']), (1200, ['budget_100'])])
+def test_budget_threshold_boundaries(budget_db, amount, expected):
+    from app.models import Budget
+    assert budget_create(amount).status_code == 201
+    assert [item.type for item in budget_notices(budget_db)] == expected
+    assert all(item.user_id == 1 and item.is_read is False for item in budget_notices(budget_db))
+    assert budget_db.get(Budget, 1).current_amount == amount
+    assert budget_db.get(Wallet, 1).balance == 10000 - amount
+
+
+def test_budget_levels_once_after_delete_restore(budget_db):
+    from app.models import Budget
+    first = budget_create(800).json()['id']
+    assert budget_create(200).status_code == 201
+    assert budget_create(100).status_code == 201
+    assert [n.type for n in budget_notices(budget_db)] == ['budget_80', 'budget_100']
+    assert client.delete(f'/api/v1/transactions/{first}').status_code == 200
+    assert budget_db.get(Transaction, first).delete_at is not None
+    assert budget_db.get(Budget, 1).current_amount == 300
+    assert budget_db.get(Wallet, 1).balance == 9700
+    assert client.post(f'/api/v1/transactions/{first}/restore').status_code == 200
+    assert budget_db.get(Transaction, first).delete_at is None
+    assert budget_db.get(Budget, 1).current_amount == 1100
+    assert budget_db.get(Wallet, 1).balance == 8900
+    assert client.post(f'/api/v1/transactions/{first}/restore').status_code == 404
+    assert len(budget_notices(budget_db)) == 2
+    assert budget_db.get(Budget, 1).alert_sent_level == 100
+
+
+def test_budget_update_moves_both_budgets(budget_db):
+    from app.models import Budget
+    txn = budget_create(700).json()['id']
+    response = client.put(f'/api/v1/transactions/{txn}', json={'amount': 1000, 'category_id': 2})
+    assert response.status_code == 200
+    assert budget_db.get(Budget, 1).current_amount == 0
+    assert budget_db.get(Budget, 2).current_amount == 1000
+    assert [n.type for n in budget_notices(budget_db)] == ['budget_100']
+    assert budget_notices(budget_db)[0].content == 'Ngân sách Travel đã đạt hạn mức.'
+    assert budget_db.get(Wallet, 1).balance == 9000
+
+
+def test_budget_bulk_only_highest_final_level(budget_db):
+    payload = {'transactions': [{'wallet_id': 1, 'category_id': 1, 'type': 'expense', 'amount': amount}
+                                for amount in [800, 200, 100]]}
+    assert client.post('/api/v1/transactions/bulk', json=payload).status_code == 201
+    assert [n.type for n in budget_notices(budget_db)] == ['budget_100']
+
+
+def test_budget_income_and_other_owner_no_notification(budget_db):
+    assert budget_create(1200, type='income').status_code == 201
+    assert budget_create(1200, wallet_id=2).status_code == 422
+    assert budget_notices(budget_db) == []
+
+
+@pytest.mark.parametrize('operation', ['create', 'update', 'delete', 'restore', 'bulk'])
+def test_budget_notice_failure_rolls_back_everything(budget_db, monkeypatch, operation):
+    from sqlalchemy import select
+    from app.models import Budget
+    from app.repositories import notification_repo
+    txn_id = None
+    if operation != 'create' and operation != 'bulk':
+        txn_id = budget_create(900).json()['id']
+        if operation == 'restore':
+            assert client.delete(f'/api/v1/transactions/{txn_id}').status_code == 200
+        # Simulate an existing unnotified budget; only this isolated test DB is changed.
+        budget_db.get(Budget, 1).alert_sent_level = None
+        budget_db.commit()
+    before_wallet = budget_db.get(Wallet, 1).balance
+    before_spent = budget_db.get(Budget, 1).current_amount
+    before_txns = [(t.id, t.amount, t.delete_at) for t in budget_db.scalars(select(Transaction)).all()]
+    before_notices = len(budget_notices(budget_db))
+    add_notice = notification_repo.add_budget_notice
+    def fail(*args, **kwargs):
+        add_notice(*args, **kwargs)
+        args[0].flush()
+        raise RuntimeError('Simulated budget notification failure')
+    monkeypatch.setattr(notification_repo, 'add_budget_notice', fail)
+    if operation == 'create':
+        response = budget_create(800)
+    elif operation == 'bulk':
+        response = client.post('/api/v1/transactions/bulk', json={'transactions': [
+            {'wallet_id': 1, 'category_id': 1, 'type': 'expense', 'amount': 1000}]})
+    elif operation == 'update':
+        response = client.put(f'/api/v1/transactions/{txn_id}', json={'amount': 1000})
+    elif operation == 'delete':
+        # Keep remaining spending above 80% after removing a small expense.
+        extra = Transaction(user_id=1, wallet_id=1, category_id=1, budget_id=1,
+                            type='expense', amount=10, source='manual')
+        budget_db.add(extra)
+        budget_db.get(Wallet, 1).balance -= 10
+        budget_db.get(Budget, 1).current_amount += 10
+        budget_db.commit()
+        before_wallet -= 10
+        before_spent += 10
+        before_txns = [(t.id, t.amount, t.delete_at) for t in budget_db.scalars(select(Transaction)).all()]
+        response = client.delete(f'/api/v1/transactions/{extra.id}')
+    else:
+        response = client.post(f'/api/v1/transactions/{txn_id}/restore')
+    assert response.status_code == 500
+    budget_db.expire_all()
+    assert budget_db.get(Wallet, 1).balance == before_wallet
+    assert budget_db.get(Budget, 1).current_amount == before_spent
+    assert [(t.id, t.amount, t.delete_at) for t in budget_db.scalars(select(Transaction)).all()] == before_txns
+    assert len(budget_notices(budget_db)) == before_notices
+    assert budget_db.get(Budget, 1).alert_sent_level is None or operation in ['create', 'bulk']
+
+
+def test_budget_sync_does_not_notify_foreign_owner(budget_db):
+    from app.models import Budget
+    from app.services.budget_service import BudgetService
+    foreign = budget_db.get(Budget, 3)
+    foreign.current_amount = 2000
+    budget_db.commit()
+    BudgetService.sync_budget_spent(budget_db, 3, user_id=1)
+    budget_db.commit()
+    assert budget_notices(budget_db) == []
+    assert foreign.current_amount == 2000
+
+
+def test_budget_update_crosses_threshold_once(budget_db):
+    txn = budget_create(700).json()['id']
+    for amount in [800, 900, 1000, 1100]:
+        assert client.put(f'/api/v1/transactions/{txn}', json={'amount': amount}).status_code == 200
+    assert [n.type for n in budget_notices(budget_db)] == ['budget_80', 'budget_100']
+
+
+def test_budget_restore_can_generate_first_alert(budget_db):
+    from app.models import Budget
+    txn = Transaction(user_id=1, wallet_id=1, category_id=1, budget_id=1,
+                      type='expense', amount=800, source='manual', delete_at=datetime.now())
+    budget_db.add(txn)
+    budget_db.commit()
+    assert client.post(f'/api/v1/transactions/{txn.id}/restore').status_code == 200
+    assert [n.type for n in budget_notices(budget_db)] == ['budget_80']
+    assert budget_db.get(Budget, 1).alert_sent_level == 80
+    assert budget_db.get(Wallet, 1).balance == 9200
+
+
+@pytest.mark.parametrize('spent,expected', [
+    (800000, 'Ngân sách Ăn uống sắp đạt hạn mức. Đã chi 800.000đ / 1.000.000đ (80%).'),
+    (805000, 'Ngân sách Ăn uống sắp đạt hạn mức. Đã chi 805.000đ / 1.000.000đ (80,5%).'),
+    (999999, 'Ngân sách Ăn uống sắp đạt hạn mức. Đã chi 999.999đ / 1.000.000đ (99,99%).'),
+    (1000000, 'Ngân sách Ăn uống đã đạt hạn mức.'),
+    (1250000, 'Ngân sách Ăn uống đã vượt hạn mức. Đã chi 1.250.000đ / 1.000.000đ (125%), vượt 250.000đ.'),
+    (1333333, 'Ngân sách Ăn uống đã vượt hạn mức. Đã chi 1.333.333đ / 1.000.000đ (133,33%), vượt 333.333đ.'),
+])
+def test_budget_notification_content_uses_category_and_vnd(budget_db, spent, expected):
+    from app.models import Budget, Category
+    budget_db.get(Category, 1).name = 'Ăn uống'
+    budget_db.get(Budget, 1).budget_amount = 1000000
+    budget_db.get(Wallet, 1).balance = 2000000
+    budget_db.commit()
+    assert budget_create(spent).status_code == 201
+    notice = budget_notices(budget_db)[0]
+    assert notice.content == expected
+    assert notice.title == expected.split('. Đã chi')[0].rstrip('.')
+    assert '#1' not in notice.content
+
+
+def test_budget_notice_name_is_loaded_from_database(budget_db):
+    from app.models import Category
+    budget_db.get(Category, 1).name = 'Danh mục đổi tên'
+    budget_db.commit()
+    assert budget_create(800).status_code == 201
+    assert budget_notices(budget_db)[0].content.startswith('Ngân sách Danh mục đổi tên sắp đạt hạn mức.')

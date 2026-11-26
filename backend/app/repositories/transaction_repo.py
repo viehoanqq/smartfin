@@ -89,34 +89,18 @@ def update_transaction_atomic(
 
 
 def soft_delete_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, revert_delta: int):
-    try:
-        # 1. Hoàn lại số dư vào ví
-        wallet.balance += revert_delta
-        
-        # 2. Đánh dấu xóa mềm
-        txn.deleted_at = func.now()
-
-        db.commit()
-        return True
-    except Exception as e:
-        db.rollback()
-        raise e
+    # The service commits wallet, transaction, budget and notification together.
+    wallet.balance += revert_delta
+    txn.delete_at = func.now()
+    db.flush()
+    return True
 
 
 def restore_transaction_atomic(db: Session, txn: Transaction, wallet: Wallet, apply_delta: int) -> Transaction:
-    try:
-        # 1. Cộng/Trừ lại số dư vào ví
-        wallet.balance += apply_delta
-        
-        # 2. Gỡ đánh dấu xóa mềm
-        txn.deleted_at = None
-
-        db.commit()
-        db.refresh(txn)
-        return txn
-    except Exception as e:
-        db.rollback()
-        raise e
+    wallet.balance += apply_delta
+    txn.delete_at = None
+    db.flush()
+    return txn
     
 def get_filtered_transactions(
     db: Session,

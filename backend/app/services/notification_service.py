@@ -5,6 +5,17 @@ from app.repositories import notification_repo
 
 class NotificationService:
     @staticmethod
+    def notify_budget_threshold(db: Session, budget):
+        """Caller holds the budget row lock and owns the transaction."""
+        spent, limit = int(budget.current_amount or 0), int(budget.budget_amount or 0)
+        if limit <= 0:
+            return
+        level = 100 if spent >= limit else 80 if spent * 100 >= limit * 80 else 0
+        if level and level > int(budget.alert_sent_level or 0):
+            notification_repo.add_budget_notice(db, budget.user_id, budget.id, level, spent, limit)
+            budget.alert_sent_level = level
+
+    @staticmethod
     def list_notifications(db: Session, user_id: int, page: int, page_size: int):
         return {"items": notification_repo.list_for_user(db, user_id, (page - 1) * page_size, page_size),
                 "total": notification_repo.count_for_user(db, user_id), "page": page, "page_size": page_size}

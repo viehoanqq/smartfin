@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 # Đổi đường dẫn import cho khớp file chứa các class Budget, Transaction của bạn
 # Ví dụ: from app.models.models import Budget, Transaction
 from app.models import Budget, Transaction
+from app.services.notification_service import NotificationService
 
 
 class BudgetService:
@@ -30,12 +31,17 @@ class BudgetService:
         )
 
     @staticmethod
-    def sync_budget_spent(db: Session, budget_id: Optional[int]) -> None:
+    def sync_budget_spent(db: Session, budget_id: Optional[int], *, user_id: Optional[int] = None) -> None:
         """Tính lại current_amount của budget từ các giao dịch expense chưa bị xóa mềm."""
         if not budget_id:
             return
 
-        budget = db.query(Budget).filter(Budget.id == budget_id).first()
+        db.flush()
+        # Refresh the high-water mark after waiting for concurrent transactions.
+        query = db.query(Budget).filter(Budget.id == budget_id)
+        if user_id is not None:
+            query = query.filter(Budget.user_id == user_id)
+        budget = query.populate_existing().with_for_update().first()
         if not budget:
             return
 
@@ -50,6 +56,7 @@ class BudgetService:
         )
 
         budget.current_amount = int(total_spent or 0)
+        NotificationService.notify_budget_threshold(db, budget)
         db.flush()
 
     @staticmethod

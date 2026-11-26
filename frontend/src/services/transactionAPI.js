@@ -24,6 +24,7 @@ export const transactionAPI = {
    */
   createTransaction: async (data) => {
     const response = await axiosClient.post('/transactions', data);
+    window.dispatchEvent(new Event('notifications-changed'));
     return response.data ?? response;
   },
 
@@ -34,6 +35,7 @@ export const transactionAPI = {
    */
   updateTransaction: async (txnId, data) => {
     const response = await axiosClient.put(`/transactions/${txnId}`, data);
+    window.dispatchEvent(new Event('notifications-changed'));
     return response.data ?? response;
   },
 
@@ -43,6 +45,7 @@ export const transactionAPI = {
    */
   deleteTransaction: async (txnId) => {
     const response = await axiosClient.delete(`/transactions/${txnId}`);
+    window.dispatchEvent(new Event('notifications-changed'));
     return response.data ?? response;
   },
 
@@ -52,6 +55,7 @@ export const transactionAPI = {
    */
   restoreTransaction: async (txnId) => {
     const response = await axiosClient.post(`/transactions/${txnId}/restore`);
+    window.dispatchEvent(new Event('notifications-changed'));
     return response.data ?? response;
   },
 
@@ -62,6 +66,7 @@ export const transactionAPI = {
   createBulkTransactions: async (transactionsList) => {
     const payload = { transactions: transactionsList };
     const response = await axiosClient.post('/transactions/bulk', payload);
+    window.dispatchEvent(new Event('notifications-changed'));
     return response.data ?? response;
   },
 

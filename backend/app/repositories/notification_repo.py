@@ -1,6 +1,7 @@
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
-from app.models import Notification
+from decimal import Decimal, ROUND_DOWN
+from app.models import Budget, Category, Notification
 
 
 def list_for_user(db: Session, user_id: int, offset: int, limit: int):
@@ -31,3 +32,34 @@ def add_password_notice(db: Session, user_id: int, reset: bool = False):
                         title="Đặt lại mật khẩu thành công" if reset else "Đổi mật khẩu thành công",
                         content="Mật khẩu của bạn đã được cập nhật. Nếu bạn không thực hiện thao tác này, hãy liên hệ hỗ trợ.",
                         is_read=False))
+
+
+def add_budget_notice(db: Session, user_id: int, budget_id: int, level: int, spent: int, limit: int):
+    category_name = db.scalar(
+        select(Category.name).join(Budget, Budget.category_id == Category.id)
+        .where(Budget.id == budget_id, Budget.user_id == user_id)
+    )
+    if category_name is None:
+        raise ValueError("Không tìm thấy danh mục ngân sách của người dùng.")
+    name = f"Ngân sách {category_name}"
+    def money(amount: int) -> str:
+        return f"{amount:,}".replace(",", ".") + "đ"
+
+    # Do not round spending below the limit up to a misleading 100%.
+    percent = format((Decimal(spent) * 100 / Decimal(limit)).quantize(
+        Decimal("0.01"), rounding=ROUND_DOWN), "f").rstrip("0").rstrip(".").replace(".", ",")
+    if spent > limit:
+        title = f"{name} đã vượt hạn mức"
+        content = f"{title}. Đã chi {money(spent)} / {money(limit)} ({percent}%), vượt {money(spent - limit)}."
+    elif spent == limit:
+        title = f"{name} đã đạt hạn mức"
+        content = f"{title}."
+    else:
+        title = f"{name} sắp đạt hạn mức"
+        content = f"{title}. Đã chi {money(spent)} / {money(limit)} ({percent}%)."
+    db.add(Notification(
+        user_id=user_id, type=f"budget_{level}",
+        title=title,
+        content=content,
+        is_read=False,
+    ))
