@@ -1,0 +1,52 @@
+
+## Bi-Encoder gốc
+$ I:\test\smartfin\backend\venv\Scripts\python.exe I:\test\smartfin\ml\evaluate_nlp.py --data-dir I:\test\smartfin\ml\data\runs\run1 --model-dir I:\test\smartfin\backend\models\biencoder --validation-only
+2026-11-26 21:00:17 INFO  WordSegmenter:24 - Loading Word Segmentation model
+validation accuracy=0.729; macro-F1=0.761; k=1; threshold=0.50
+
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  28%|##7       | 55/199 [00:00<00:00, 549.11it/s]
+Loading weights:  55%|#####5    | 110/199 [00:00<00:00, 451.59it/s]
+Loading weights: 100%|##########| 199/199 [00:00<00:00, 823.43it/s]
+
+
+## TF-IDF + SVM
+$ I:\test\smartfin\backend\venv\Scripts\python.exe I:\test\smartfin\ml\evaluate_tfidf.py --data-dir I:\test\smartfin\ml\data\runs\run1 --validation-only
+validation: accuracy=0.890; macro-F1=0.877
+               precision    recall  f1-score   support
+
+    Di chuyển       0.94      1.00      0.97        30
+     Gia đình       0.90      0.87      0.88        30
+     Giáo dục       0.93      0.90      0.92        30
+     Giải trí       0.88      0.77      0.82        30
+      Hóa đơn       0.75      0.90      0.82        30
+         Khác       1.00      0.50      0.67         4
+        Lương       0.97      1.00      0.98        30
+      Mua sắm       0.75      0.90      0.82        30
+        Nhà ở       0.83      0.83      0.83        30
+     Quà tặng       0.94      1.00      0.97        30
+     Sức khỏe       0.90      0.90      0.90        30
+Thu nhập khác       0.88      0.77      0.82        30
+       Thu nợ       0.87      0.87      0.87        30
+       Thưởng       1.00      1.00      1.00        30
+       Trả nợ       0.93      0.83      0.88        30
+      Ăn uống       0.93      0.87      0.90        30
+
+     accuracy                           0.89       454
+    macro avg       0.90      0.87      0.88       454
+ weighted avg       0.89      0.89      0.89       454
+
+
+
+
+## Bi-Encoder fine-tuned
+$ I:\test\smartfin\backend\venv\Scripts\python.exe I:\test\smartfin\ml\evaluate_nlp.py --data-dir I:\test\smartfin\ml\data\runs\run1 --model-dir I:\test\smartfin\backend\models\biencoder_run1 --validation-only
+2026-11-26 21:01:03 INFO  WordSegmenter:24 - Loading Word Segmentation model
+validation accuracy=0.949; macro-F1=0.944; k=3; threshold=0.50
+
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  23%|##2       | 45/199 [00:00<00:00, 441.26it/s]
+Loading weights: 100%|##########| 199/199 [00:00<00:00, 1098.60it/s]
+

@@ -1,6 +1,7 @@
 """Cheap supervised baseline to compare against Bi-Encoder before fine-tuning."""
 import argparse
 from pathlib import Path
+import sys
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score, classification_report, f1_score
@@ -11,6 +12,7 @@ from evaluate_nlp import read
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--validation-only", action="store_true")

@@ -11,7 +11,14 @@
 
 ## Cài trên máy phát triển
 
-Java đã cần cho VnCoreNLP (`java -version`). Từ thư mục `SmartFin/backend` trong PowerShell:
+VnCoreNLP cần JDK và biến môi trường `JAVA_HOME` (chỉ có `java` trên `PATH` là chưa đủ cho PyJNIus). Trong PowerShell, đặt biến cho cửa sổ hiện tại đến thư mục cài JDK, không phải thư mục `bin`:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-<version>"
+java -version
+```
+
+Sau đó từ thư mục `SmartFin/backend` chạy:
 
 ```powershell
 .\venv\Scripts\python.exe -m pip install -r requirements-ai.txt

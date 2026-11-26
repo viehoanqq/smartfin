@@ -9,6 +9,12 @@ MODEL_DIR = Path(__file__).resolve().parents[3] / "models" / "vncorenlp"
 def get_segmenter():
     if not (MODEL_DIR / "VnCoreNLP-1.2.jar").exists() or not (MODEL_DIR / "models" / "wordsegmenter" / "wordsegmenter.rdr").exists():
         return None
+    java_home = os.environ.get("JAVA_HOME")
+    if not java_home or not Path(java_home).is_dir():
+        raise RuntimeError(
+            "JAVA_HOME is not set or does not point to an existing JDK folder. "
+            "PyJNIus/VnCoreNLP requires JAVA_HOME even when java is on PATH."
+        )
     import py_vncorenlp
     previous_directory = os.getcwd()
     try:

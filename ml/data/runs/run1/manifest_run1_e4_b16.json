@@ -1,0 +1,12 @@
+{
+  "run_name": "run1",
+  "model_name": "run1_e4_b16",
+  "reviewed_csv": "I:\\test\\smartfin\\ml\\data\\reviewed_labels.csv",
+  "seed": 42,
+  "epochs": 4,
+  "batch_size": 16,
+  "device": "NVIDIA GeForce RTX 4060",
+  "model_dir": "I:\\test\\smartfin\\backend\\models\\biencoder_run1_e4_b16",
+  "data_dir": "I:\\test\\smartfin\\ml\\data\\runs\\run1",
+  "note": "Choose using validation; run final test only once after choosing the model."
+}
